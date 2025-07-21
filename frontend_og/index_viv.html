@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Rate Your Favorite Categories</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: url('https://www.transparenttextures.com/patterns/flower.png');
+            background-color: #f9f4f0;
+            margin: 0;
+            padding: 50px;
+            text-align: center;
+        }
+        h1 {
+            color: #444;
+            margin-bottom: 20px;
+        }
+        .rating-boxes {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 30px;
+            gap: 10px;
+        }
+        .rating {
+            width: 300px;
+            min-height: 60px;
+            border: 2px dashed #aaa;
+            border-radius: 10px;
+            color: #555;
+            background-color: #fff8f8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 5px;
+            padding: 5px;
+        }
+        .categories {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 30px;
+            min-height: 70px;
+            border: 2px dashed #aaa;
+            border-radius: 10px;
+            padding: 10px;
+            background-color: #fff8f8;
+        }
+        .category {
+            padding: 10px 20px;
+            border-radius: 20px;
+            background-color: #ffefef;
+            border: 1px solid #ffcccc;
+            cursor: grab;
+            user-select: none;
+            display: inline-block;
+            margin: 5px 0;
+        }
+        .rating .category {
+            cursor: grab;
+        }
+        button {
+            margin-top: 40px;
+            padding: 10px 30px;
+            font-size: 16px;
+            border: none;
+            background-color: #ff8fa3;
+            color: white;
+            border-radius: 25px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #ff5b7f;
+        }
+    </style>
+</head>
+<body>
+    <h1>Arrange Categories by Your Preference</h1>
+    <div class="rating-boxes">
+        <div class="rating" data-rating="5">Rating 5 ⭐</div>
+        <div class="rating" data-rating="4">Rating 4 ⭐</div>
+        <div class="rating" data-rating="3">Rating 3 ⭐</div>
+        <div class="rating" data-rating="2">Rating 2 ⭐</div>
+        <div class="rating" data-rating="1">Rating 1 ⭐</div>
+    </div>
+
+    <div class="categories">
+        <div class="category" draggable="true">Casual Wear</div>
+        <div class="category" draggable="true">Formal Wear</div>
+        <div class="category" draggable="true">Sportswear</div>
+        <div class="category" draggable="true">Winter Collection</div>
+        <div class="category" draggable="true">Accessories</div>
+    </div>
+
+    <button onclick="submitRatings()">Submit</button>
+
+    <script>
+        const categoriesContainer = document.querySelector('.categories');
+        const categories = document.querySelectorAll('.category');
+        const ratings = document.querySelectorAll('.rating');
+        let draggedItem = null;
+
+        // Handle drag start on categories and rating box items
+        function handleDragStart(e) {
+            draggedItem = e.target;
+            setTimeout(() => draggedItem.style.display = 'none', 0);
+        }
+
+        // Handle drag end - show dragged item again
+        function handleDragEnd(e) {
+            if (draggedItem) draggedItem.style.display = 'inline-block';
+            draggedItem = null;
+        }
+
+        categories.forEach(item => {
+            item.addEventListener('dragstart', handleDragStart);
+            item.addEventListener('dragend', handleDragEnd);
+        });
+
+        // Make rating boxes and categories container droppable
+        function allowDrop(e) {
+            e.preventDefault();
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            if (draggedItem) {
+                draggedItem.style.display = 'inline-block';
+                e.currentTarget.appendChild(draggedItem);
+            }
+        }
+
+        // Allow dropping on each rating box
+        ratings.forEach(box => {
+            box.addEventListener('dragover', allowDrop);
+            box.addEventListener('drop', handleDrop);
+        });
+
+        // Allow dropping back to categories container
+        categoriesContainer.addEventListener('dragover', allowDrop);
+        categoriesContainer.addEventListener('drop', handleDrop);
+
+        function submitRatings() {
+            const result = [];
+            ratings.forEach(box => {
+                const category = box.querySelector('.category');
+                if (category) {
+                    result.push({
+                        category: category.textContent.trim(),
+                        rating: parseInt(box.dataset.rating)
+                    });
+                }
+            });
+
+            fetch('http://your-api-endpoint.com/submit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(result)
+            })
+            .then(res => res.json())
+            .then(data => alert('Submitted successfully!'))
+            .catch(err => alert('Submission failed.'));
+        }
+    </script>
+</body>
+</html>

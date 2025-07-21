@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>HD-VITON Try-On</title>
+</head>
+<body>
+  <h2>Enter Cloth ID</h2>
+  <form id="tryon-form">
+    <label>Cloth Filename (e.g. 02736_00.jpg):</label><br>
+    <input type="text" id="cloth_id" name="cloth_id" required><br><br>
+    <button type="submit">Generate Try-On</button>
+  </form>
+
+  <div id="result" style="margin-top: 20px;"></div>
+
+  <script>
+    document.getElementById("tryon-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const formData = new FormData();
+      formData.append("cloth_id", document.getElementById("cloth_id").value);
+
+      const res = await fetch("/tryon/", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const blob = await res.blob();
+        const imgURL = URL.createObjectURL(blob);
+        document.getElementById("result").innerHTML = `<h3>Result:</h3><img src="${imgURL}" width="300"/>`;
+      } else {
+        const err = await res.json();
+        document.getElementById("result").innerHTML = `❌ Error: ${err.message}`;
+      }
+    });
+  </script>
+</body>
+</html>

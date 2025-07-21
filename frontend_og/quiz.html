@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Style Quiz Recommendations</title>
+</head>
+<body>
+  <h2>Style Quiz Based Recommendations</h2>
+
+  <p>Paste your style quiz result JSON below:</p>
+  <textarea id="quiz-input" rows="10" cols="80">
+{
+  "Category": { "1": "Tank-Top", "2": "Tube-Top", "3": "BodySuit" },
+  "Colour": { "1": "Pink", "2": "White", "3": "Black" },
+  "Pattern": { "1": "Floral", "2": "Graphic" }
+}
+  </textarea>
+  <br><br>
+  <button id="quiz-btn">Get Quiz Recommendations</button>
+
+  <div id="quiz-recommendations" style="margin-top: 20px;"></div>
+
+  <script>
+    document.getElementById("quiz-btn").addEventListener("click", async () => {
+      const rawJson = document.getElementById("quiz-input").value;
+
+      let quizData;
+      try {
+        quizData = JSON.parse(rawJson);
+      } catch (err) {
+        alert("Invalid JSON format!");
+        return;
+      }
+
+      const res = await fetch("/stylequiz/recommend", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(quizData)
+      });
+
+      const data = await res.json();
+
+      let html = "<h3>Top 50 Quiz-Based Recommendations:</h3><ol>";
+      for (const item of data.recommendations) {
+        html += `<li>${item}</li>`;
+      }
+      html += "</ol>";
+
+      document.getElementById("quiz-recommendations").innerHTML = html;
+    });
+  </script>
+</body>
+</html>

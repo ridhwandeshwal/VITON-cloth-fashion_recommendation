@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Cloth Recommendation Test</title>
+</head>
+<body>
+  <h2>Recommendation System Test</h2>
+
+  <div id="cloth-container">
+    <img src="static/00000_00.jpg" alt="Sample Cloth" width="200px" />
+    <p>ID: <span id="cloth-id">00000_00.jpg</span></p>
+    <button id="rec-btn">Get Recommendations</button>
+  </div>
+
+  <div id="recommendations" style="margin-top: 20px;"></div>
+
+  <script>
+    document.getElementById("rec-btn").addEventListener("click", () => {
+      const cloth_id = document.getElementById("cloth-id").innerText;
+      getRecommendations(cloth_id);
+    });
+
+    async function getRecommendations(cloth_id) {
+      const res = await fetch(`/recommend/${cloth_id}`);
+      const data = await res.json();
+
+      let html = "<h3>Top 50 Recommendations:</h3><ol>";
+      for (const item of data.recommendations) {
+        html += `<li>${item}</li>`;
+      }
+      html += "</ol>";
+
+      document.getElementById("recommendations").innerHTML = html;
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>User Login</title>
+</head>
+<body>
+  <h2>Create User in Neo4j</h2>
+  <button></button>
+  <form id="user-form">
+    <label>Enter Username:</label><br>
+    <input type="text" id="username" name="username" required><br><br>
+    <button type="submit">Submit</button>
+  </form>
+
+  <div id="result" style="margin-top:20px;"></div>
+  
+  <div id="cloth-container">
+    <img src="static/00000_00.jpg" alt="Sample Cloth" width="200px" />
+    <p>ID: <span id="cloth-id">00000_00.jpg</span></p>
+    <button id="rec-btn">Get Recommendations</button>
+  </div>
+
+  <div id="recommendations" style="margin-top: 20px;"></div>
+  <script>
+    document.getElementById('user-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const username = document.getElementById('username').value;
+
+      const res = await fetch('/userlogin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ username })
+      });
+
+    const data = await res.json();
+    document.getElementById('result').innerText = data.message;
+
+
+    document.getElementById("rec-btn").addEventListener("click", () => {
+      getRecommendations("00000_00.jpg");
+    });
+    async function getRecommendations(cloth_id) {
+      console.log("Function started")
+      const res = await fetch(`/recommend/${cloth_id}`);
+      const data = await res.json();
+
+      let html = "<h3>Top 50 Recommendations:</h3><ol>";
+      for (const item of data.recommendations) {
+        html += `<li>${item}</li>`;
+      }
+      html += "</ol>";
+
+      document.getElementById("recommendations").innerHTML = html;
+    }
+
+    });
+  </script>
+</body>
+</html>
