@@ -165,15 +165,19 @@ chatbotSend.addEventListener("click", () => {
   chatbotInput.value = "";
 
   setTimeout(() => {
-//     let response = `🧠 Styling Advice:
-// 🎉 Vibe Summary: Bold & Glam Night Out 🌟
-// 👖 Bottoms: Black leather pants
-// 👟 Footwear: High heels
-// 🧥 Outerwear: Statement blazer
-// 💄 Makeup: Bold lipstick and smoky eyes
-// 💇 Hairstyle: Sleek straight hair
-// 💍 Accessories: Sparkly earrings and clutch bag`;
-    let response ="🧠 Styling Advice:\n🎉 Vibe Summary: Bold & Glam Night Out 🌟\n👖 Bottoms: Black leather pants\n👟 Footwear: High heels\n🧥 Outerwear: Statement blazer\n💄 Makeup: Bold lipstick and smoky eyes\n💇 Hairstyle: Sleek straight hair\n💍 Accessories: Sparkly earrings and clutch bag"
+    let response = `🧠 Styling Advice:
+ 🎉🎉🎉 Vibe Summary: Bold & Glam Night Out 🌟
+
+👖 Bottoms: Black leather pants (comfortable, slimming, and complement the outfit)
+👟 Footwear: High heels (add height and confidence)
+🧥 Outerwear: A statement blazer or shrug (add texture and style)
+💄 Makeup: Bold lipstick, dramatic eyeshadow, and a smoky eye look (enhance the glam vibe)
+💇 Hairstyle: Straight, sleek hair (match the vibe and practicality)
+💍 Accessories: Earrings (add sparkle), a statement necklace (add drama), and a clutch (complete the look)
+
+Remember to have fun and enjoy the night out! 🎉🎉🎉
+`;
+    // let response ="🧠 Styling Advice:\n🎉 Vibe Summary: Bold & Glam Night Out 🌟\n👖 Bottoms: Black leather pants\n👟 Footwear: High heels\n🧥 Outerwear: Statement blazer\n💄 Makeup: Bold lipstick and smoky eyes\n💇 Hairstyle: Sleek straight hair\n💍 Accessories: Sparkly earrings and clutch bag"
 
     const lower = userMsg.toLowerCase();
 

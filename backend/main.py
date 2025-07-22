@@ -26,7 +26,7 @@ app.mount("/model-images", StaticFiles(directory="backend/HD-VITON/VITON-HD/data
 
 @app.get("/", response_class=HTMLResponse)
 def home():
-    with open("frontend/quiz1.html", "rb") as f:
+    with open("frontend/style-quiz-page.html", "rb") as f:
         content = f.read().decode("utf-8", errors="replace")
     return HTMLResponse(content=content)
 
@@ -207,7 +207,6 @@ async def search_query(request: Request):
 async def custom_recommend(request: Request):
     data = await request.json()
 
-    # Extract filters
     filters = {
         "Category": data.get("Category", []),
         "Pattern": data.get("Pattern", []),
@@ -218,22 +217,36 @@ async def custom_recommend(request: Request):
         "Neckline": data.get("Neckline", []),
         "Sleeve": data.get("Sleeve", []),
     }
-    driver=connection()
+
+    # Map filter key to (relationship_type, label, property_name)
+    schema_map = {
+        "Category": ("is_category", "Category", "name"),
+        "Pattern": ("has_pattern", "Pattern", "name"),
+        "Color": ("has_color", "Color", "name"),
+        "Material": ("has_material", "Material", "name"),
+        "Occasion": ("is_occasion", "Occasion", "name"),
+        "Season": ("has_season", "Season", "name"),
+        "Neckline": ("has_neckline", "Neckline", "name"),
+        "Sleeve": ("has_sleeve", "Sleeve", "name"),
+    }
+
     all_ids = []
+    driver=connection()
     for key, values in filters.items():
+        if key not in schema_map:
+            continue
+        rel, label, prop = schema_map[key]
+
         for val in values:
-            records, _, _ = driver.execute_query(
-                """
-                MATCH (c:Cloth)-[:has_attribute]->(:Attribute {type: $type, value: $value})
-                RETURN c.name AS cloth_id
-                """,
-                type=key, value=val,
-                database_="neo4j"
-            )
-            all_ids.extend([r["cloth_id"] for r in records])
+            with driver.session() as session:
+                result = session.run(
+                    f"""
+                    MATCH (c:Cloth)-[:{rel}]->(a:{label} {{{prop}: $val}})
+                    RETURN c.name AS cloth_id
+                    """,
+                    val=val
+                )
+                all_ids.extend([r["cloth_id"] for r in result])
 
-    # Top 50 most common
-    from collections import Counter
     top_ids = [item for item, _ in Counter(all_ids).most_common(50)]
-
     return {"recommendations": top_ids}
