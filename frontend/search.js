@@ -1,29 +1,32 @@
-const items = [
-  { image: "images/00001_00.jpg", label: "Floral Dress", link: "cloth-page.html?id=00001" },
-  { image: "images/00002_00.jpg", label: "Pink Top", link: "cloth-page.html?id=00002" },
-  { image: "images/00003_00.jpg", label: "Silk Shirt", link: "cloth-page.html?id=00003" },
-  // Add more items here with different links
-];
-
 const container = document.getElementById("search-results");
-items.forEach(item => {
-  const card = document.createElement("div");
-  card.className = "result-card";
+const items = JSON.parse(localStorage.getItem("searchResults")) || [];
 
-  // Wrap image in a link
-  const link = document.createElement("a");
-  link.href = item.link;
+if (items.length === 0) {
+  container.innerHTML = "<p style='color:#a31967;'>No items found for your query.</p>";
+} else {
+  items.forEach(id => {
+    const card = document.createElement("div");
+    card.className = "result-card";
 
-  const img = document.createElement("img");
-  img.src = item.image;
-  img.alt = item.label;
+    const link = document.createElement("a");
+    link.href = `cloth-page.html?id=${id.replace(".jpg", "")}`;
 
-  const label = document.createElement("p");
-  label.textContent = item.label;
+    const img = document.createElement("img");
+    img.src = `images/${id}`;
+    img.alt = id;
 
-  link.appendChild(img);
-  card.appendChild(link);
-  card.appendChild(label);
-  container.appendChild(card);
-});
+    const label = document.createElement("p");
+    label.textContent = id;
 
+    link.appendChild(img);
+    card.appendChild(link);
+    card.appendChild(label);
+    container.appendChild(card);
+  });
+}
+
+const prevQuery = localStorage.getItem("lastSearchQuery");
+if (prevQuery) {
+  const input = document.getElementById("search-input");
+  if (input) input.value = prevQuery;
+}

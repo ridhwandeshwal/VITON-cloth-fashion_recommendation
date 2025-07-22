@@ -5,11 +5,18 @@ import shutil
 import os
 import subprocess
 import sys
+import glob
 
 from backend.utils.run_kaggle import run_vton_pipeline
 from backend.utils.recommendation import generate_recommendations
 from backend.utils.quiz_recommender import generate_quiz_recommendations
-print("Current Working Directory:", os.getcwd())
+
+from fastapi import FastAPI, Request
+from collections import Counter
+from neo4j import GraphDatabase
+import spacy
+from spacy.matcher import Matcher
+
 
 app = FastAPI()
 
@@ -39,9 +46,8 @@ async def tryon(person_img: UploadFile = File(...), cloth_img: UploadFile = File
 
 @app.get("/recommend/{cloth_id}")
 def recommend(cloth_id: str):
-    print("it hit")
+    # print("it hit")
     recommendations=generate_recommendations(cloth_id)
-    print(recommendations)
     return {"recommendations": recommendations}
 
 
@@ -83,7 +89,36 @@ async def run_selected_tryon(person_id: str = Form(...), cloth_id: str = Form(..
     return FileResponse(result_path, media_type="image/jpeg")
 
 
-import glob
+STYLETRANSFERDIR="backend/neural style tranfer trial/Neural-Style-Transfer"
+@app.post("/styletransfer/selected")
+async def run_selected_styletransfer(person_id: str = Form(...), cloth_id: str = Form(...)):
+    try:
+        # Run test.py for try-on
+        print("came here")
+        subprocess.run(
+            [sys.executable, "Main.py"],
+            cwd=STYLETRANSFERDIR,
+            check=True,
+            env={
+                **os.environ,
+                "CUDA_VISIBLE_DEVICES": "0",
+                "CONTENT_IMG": f"D:/trial website/frontend/cloth/{cloth_id}",
+                "STYLE_IMG": f"D:/trial website/frontend/cloth/{person_id}"
+            }
+        )
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+    # Result file name format
+    result_filename = "stylized_image.jpeg"
+    result_path = os.path.join(STYLETRANSFERDIR, result_filename)
+
+    if not os.path.exists(result_path):
+        return JSONResponse(status_code=404, content={"message": f"Try-on result not found: {result_filename}"})
+
+    return FileResponse(result_path, media_type="image/jpeg")
+
+
 
 @app.get("/models")
 def list_model_images():
@@ -91,3 +126,114 @@ def list_model_images():
     image_files = glob.glob(os.path.join(model_folder, "*.jpg"))
     filenames = [os.path.basename(f) for f in image_files]
     return {"models": filenames}
+
+
+def NER(query):
+    nlp = spacy.blank("en")
+    matcher = Matcher(nlp.vocab)
+
+    colors = ["Blue", "Red", "Green", "Yellow", "Black", "White", "Teal", "Orange", "Maroon", "Purple", "Pink", "Gray"]
+    patterns = ["Floral", "Striped", "Plain", "Polka", "Animal", "Graphic"]
+    category = ["Top", "T-shirt", "BodySuit", "Dress", "Tank-Top", "Tube-Top"]
+    material = ["Cotton", "Sequin", "Silky", "Mesh", "Synthetic"]
+    brands = ["Tommy Hilfiger", "Calvin Klein", "Levis", "Polo", "Nike", "Adidas", "Superdry", "Puma", "Gap"]
+
+    matcher.add("Color", [[{"LOWER": color.lower()}] for color in colors])
+    matcher.add("Pattern", [[{"LOWER": p.lower()}] for p in patterns])
+    matcher.add("Category", [[{"LOWER": c.lower()}] for c in category])
+    matcher.add("Material", [[{"LOWER": m.lower()}] for m in material])
+    matcher.add("Brand", [[{"LOWER": b.lower()}] for b in brands])
+
+    doc = nlp(query.lower())
+    matches = matcher(doc)
+    entities= {"Color": [], "Category": [], "Pattern": [], "Material": [], "Brand": []}
+    for match_id, start, end in matches:
+        label = nlp.vocab.strings[match_id]
+        span = doc[start:end]
+        if span.text not in entities[label]:
+            entities[label].append(span.text)
+    print(entities)
+    return entities
+
+def connection():
+    return GraphDatabase.driver(
+        uri="neo4j+s://ee387fa4.databases.neo4j.io",
+        auth=("neo4j", "oYXGQuZbCWC2VyJ65RAzSPnjq6f2WJwodZfokuEfWm8")
+    )
+
+RELATIONSHIP_MAP = {
+    "Color": ("is_colour", "Colour", "name"),
+    "Category": ("is_category", "Category", "name"),
+    "Pattern": ("has_pattern", "Pattern", "name"),
+    "Material": ("of_material", "Material", "name"),
+    "Brand": ("of_brand", "Brand", "name"),
+}
+
+@app.post("/usersearch")
+async def search_query(request: Request):
+    data = await request.json()
+    query = data.get("query")
+    entitydict = NER(query)
+    all_matches = []
+
+    driver = connection()
+
+    for entity_type, values in entitydict.items():
+        if entity_type not in RELATIONSHIP_MAP:
+            continue
+
+        rel, label, prop = RELATIONSHIP_MAP[entity_type]
+
+        for val in values:
+            val=val[:1].upper() + val[1:]
+            print(label,prop,rel,val)
+            records, _, _ = driver.execute_query(
+                f"""
+                MATCH (n:{label} {{{prop}: $value}})<-[:{rel}]-(cloth:Cloth)
+                RETURN cloth.cloth_id AS id
+                """,
+                value=val,
+                database_="neo4j"
+            )
+            all_matches.extend([row["id"] for row in records])
+    print(all_matches)
+    counter = Counter(all_matches)
+    top_50_ids = [item for item, _ in counter.most_common(50)]
+    return {"recommendations": top_50_ids}
+
+
+
+@app.post("/custom_recommend")
+async def custom_recommend(request: Request):
+    data = await request.json()
+
+    # Extract filters
+    filters = {
+        "Category": data.get("Category", []),
+        "Pattern": data.get("Pattern", []),
+        "Color": data.get("Color", []),
+        "Material": data.get("Material", []),
+        "Occasion": data.get("Occasion", []),
+        "Season": data.get("Season", []),
+        "Neckline": data.get("Neckline", []),
+        "Sleeve": data.get("Sleeve", []),
+    }
+    driver=connection()
+    all_ids = []
+    for key, values in filters.items():
+        for val in values:
+            records, _, _ = driver.execute_query(
+                """
+                MATCH (c:Cloth)-[:has_attribute]->(:Attribute {type: $type, value: $value})
+                RETURN c.name AS cloth_id
+                """,
+                type=key, value=val,
+                database_="neo4j"
+            )
+            all_ids.extend([r["cloth_id"] for r in records])
+
+    # Top 50 most common
+    from collections import Counter
+    top_ids = [item for item, _ in Counter(all_ids).most_common(50)]
+
+    return {"recommendations": top_ids}

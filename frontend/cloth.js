@@ -7,6 +7,7 @@ function getQueryParam(param) {
 const id = getQueryParam("id");
 const clothFullId = id ? `${id}.jpg` : null;
 let selectedModel = null;
+let triggerSource = null; // NEW: to track which button triggered it
 
 if (id) {
   const box = document.getElementById("selected-image-1");
@@ -39,8 +40,19 @@ document.getElementById("upload-input").addEventListener("change", (event) => {
   }
 });
 
-// "TRY IT ON!" opens model image selector
+// Open image selector from TRY IT ON
 document.getElementById("try-button").addEventListener("click", async () => {
+  triggerSource = "tryon";
+  openModelSelector();
+});
+
+// Open image selector from SELECT button for style transfer
+document.getElementById("select-image-button").addEventListener("click", async () => {
+  triggerSource = "styletransfer";
+  openModelSelector();
+});
+
+async function openModelSelector() {
   const overlay = document.getElementById("image-select-overlay");
   const gallery = document.getElementById("image-gallery");
   overlay.style.display = "flex";
@@ -69,9 +81,9 @@ document.getElementById("try-button").addEventListener("click", async () => {
     console.error("Failed to load model images:", err);
     gallery.innerHTML = `<p>Error loading model images</p>`;
   }
-});
+}
 
-// Submit selected model for try-on
+// Submit for either try-on or style transfer
 document.getElementById("submit-selection").addEventListener("click", () => {
   const overlay = document.getElementById("image-select-overlay");
   const preview = document.getElementById("preview-container");
@@ -83,16 +95,18 @@ document.getElementById("submit-selection").addEventListener("click", () => {
 
   overlay.style.display = "none";
 
-  // Show loading UI
   preview.innerHTML = `
     <div class="tryon-loader-wrapper">
       <div class="fancy-loader"></div>
-      <p class="loader-text">Trying on your outfit... Please wait</p>
+      <p class="loader-text">${triggerSource === "styletransfer" ? "Blending your outfit..." : "Trying on your outfit..."} Please wait</p>
     </div>
   `;
 
+  const endpoint = triggerSource === "styletransfer"
+    ? "/styletransfer/selected"
+    : "/tryon/selected";
 
-  fetch("/tryon/selected", {
+  fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -103,7 +117,7 @@ document.getElementById("submit-selection").addEventListener("click", () => {
     }),
   })
     .then((res) => {
-      if (!res.ok) throw new Error("Try-on failed");
+      if (!res.ok) throw new Error("Request failed");
       return res.blob();
     })
     .then((blob) => {
@@ -111,12 +125,15 @@ document.getElementById("submit-selection").addEventListener("click", () => {
       preview.innerHTML = "";
       const img = document.createElement("img");
       img.src = url;
-      img.alt = "Try-on Result";
+      img.alt = "Result Image";
       preview.appendChild(img);
     })
     .catch((err) => {
       console.error(err);
-      preview.innerHTML = "<p style='color:red;'>Try-on failed. Please try again.</p>";
+      preview.innerHTML = `<p style='color:red;'>${triggerSource === "styletransfer" ? "Style transfer" : "Try-on"} failed. Please try again.</p>`;
+    })
+    .finally(() => {
+      triggerSource = null;
     });
 });
 
@@ -148,7 +165,16 @@ chatbotSend.addEventListener("click", () => {
   chatbotInput.value = "";
 
   setTimeout(() => {
-    let response = "Interesting choice!";
+//     let response = `🧠 Styling Advice:
+// 🎉 Vibe Summary: Bold & Glam Night Out 🌟
+// 👖 Bottoms: Black leather pants
+// 👟 Footwear: High heels
+// 🧥 Outerwear: Statement blazer
+// 💄 Makeup: Bold lipstick and smoky eyes
+// 💇 Hairstyle: Sleek straight hair
+// 💍 Accessories: Sparkly earrings and clutch bag`;
+    let response ="🧠 Styling Advice:\n🎉 Vibe Summary: Bold & Glam Night Out 🌟\n👖 Bottoms: Black leather pants\n👟 Footwear: High heels\n🧥 Outerwear: Statement blazer\n💄 Makeup: Bold lipstick and smoky eyes\n💇 Hairstyle: Sleek straight hair\n💍 Accessories: Sparkly earrings and clutch bag"
+
     const lower = userMsg.toLowerCase();
 
     if (lower.includes("recommend")) {
@@ -160,12 +186,38 @@ chatbotSend.addEventListener("click", () => {
     }
 
     appendMessage(response, "bot");
-  }, 600);
+  }, 3000);
 });
 chatbotInput.addEventListener("keypress", (e) => {
   if (e.key === "Enter") chatbotSend.click();
 });
 
-document.getElementById("CR-button").addEventListener("click", () => {
-  window.location.href = "home-page.html";
+document.getElementById("CR-button").addEventListener("click", async () => {
+  const filters = {
+    Category: ["bodysuit", "leotard"],
+    Pattern: ["floral"],
+    Color: ["white"],
+    Material: ["mesh"],
+    Occasion: ["casual"],
+    Season: ["summer"],
+    Neckline: ["deep neck"],
+    Sleeve: ["thin sleeve", "sleeveless"]
+  };
+
+  try {
+    const res = await fetch("/custom_recommend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(filters),
+    });
+
+    const data = await res.json();
+    const ids = data.recommendations || [];
+
+    localStorage.setItem("customResults", JSON.stringify(ids));
+    window.location.href = "home-page.html";
+  } catch (err) {
+    alert("Could not fetch custom recommendations.");
+    console.error(err);
+  }
 });

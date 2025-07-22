@@ -15,7 +15,7 @@
           <a href="about-us.html" class="about-us">About Us</a>
           <div class="search-container">
             <input type="text" placeholder="Search..." class="search-box" id="search-input">
-            <button type="submit" class="search-button" id="search-button"><i class="fas fa-search"></i></button>
+            <button type="submit" class="search-button" id="search-button"><i class="fas fa-search"></i></button> 
           </div>
           <button><div id="click1" class="shopping-bag"><img src ="shopping-bag.png"></div></button>
           <button><div id="click2" class="wishlist"><img src ="heart.png"></div></button>
@@ -59,7 +59,7 @@
         <label><input type="checkbox" name="color" value="teal" /> <span class="dot teal"></span> Teal</label>
         <label><input type="checkbox" name="color" value="maroon" /> <span class="dot maroon"></span> Maroon</label>
         <label><input type="checkbox" name="color" value="purple" /> <span class="dot purple"></span> Purple</label>
-        <label><input type="checkbox" name="color" value="blue" /> <span class="dot Blue"></span> Blue</label>
+        <label><input type="checkbox" name="color" value="blue" /> <span class="dot blue"></span> Blue</label>
     </div>
 
       <div class="filter-section">
@@ -105,7 +105,14 @@
     </div>
 
   </div>
-
+    <script>
+      document.getElementById("search-button").addEventListener("click", () => {
+        const query = document.getElementById("search-input").value.trim();
+        if (query) {
+          window.location.href = `/new/search.html?query=${encodeURIComponent(query)}`;
+        }
+      });
+  </script>
   <script src="search.js"></script>
 </body>
 </html>
