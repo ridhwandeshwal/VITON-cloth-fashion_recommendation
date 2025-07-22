@@ -16,7 +16,7 @@ def get_similar_clothes(cloth_id: str, relationship: str, label: str, attr_name:
     """, cloth_id=cloth_id, database_="neo4j")
     return [row["id"] for row in records]
 
-def generate_recommendations(cloth_id: str) -> list[str]:
+def     generate_recommendations(cloth_id: str) -> list[str]:
     attributes = [
         ("is_colour", "Colour", "name"),
         ("has_pattern", "Pattern", "name"),

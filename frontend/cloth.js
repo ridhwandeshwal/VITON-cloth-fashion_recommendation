@@ -1,13 +1,15 @@
-// cloth.js
+// Get cloth ID from URL
 function getQueryParam(param) {
   const urlParams = new URLSearchParams(window.location.search);
   return urlParams.get(param);
 }
 
 const id = getQueryParam("id");
+const clothFullId = id ? `${id}.jpg` : null;
+let selectedModel = null;
 
 if (id) {
-  const box = document.getElementById("selected-image-1");  // this is your left panel box
+  const box = document.getElementById("selected-image-1");
   box.style.backgroundImage = `url('images/${id}.jpg')`;
   box.style.backgroundSize = "cover";
   box.style.backgroundPosition = "center";
@@ -15,73 +17,136 @@ if (id) {
   document.getElementById("selected-image-1").textContent = "No item selected.";
 }
 
-
-// Populate selected images from localStorage or any method
-const button = document.getElementById("try-button");
+// Restore file upload functionality
 const fileInput = document.getElementById("upload-input");
+fileInput.addEventListener("change", function () {
+  if (fileInput.files.length > 0) {
+    alert("Image selected: " + fileInput.files[0].name);
+  }
+});
+document.getElementById("upload-input").addEventListener("change", (event) => {
+  const file = event.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      const img = document.createElement("img");
+      img.src = e.target.result;
+      const preview = document.getElementById("preview-container");
+      preview.innerHTML = "";
+      preview.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  }
+});
 
-button.addEventListener("click", function () {
-    fileInput.click(); // Simulate click on hidden input
-        });
+// "TRY IT ON!" opens model image selector
+document.getElementById("try-button").addEventListener("click", async () => {
+  const overlay = document.getElementById("image-select-overlay");
+  const gallery = document.getElementById("image-gallery");
+  overlay.style.display = "flex";
+  gallery.innerHTML = "";
 
-        // Optional: confirm image is selected
- fileInput.addEventListener("change", function () {
-    if (fileInput.files.length > 0) {
-        alert("Image selected: " + fileInput.files[0].name);
-            }
-        });
+  try {
+    const res = await fetch("/models");
+    const data = await res.json();
 
-// Show uploaded user image
-document.getElementById('upload-input').addEventListener('change', (event) => {
-    const file = event.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const img = document.createElement('img');
-            img.src = e.target.result;
-            const preview = document.getElementById('preview-container');
-            preview.innerHTML = ''; // clear previous image
-            preview.appendChild(img);
-        };
-        reader.readAsDataURL(file);
-    }
+    data.models.forEach((filename) => {
+      const img = document.createElement("img");
+      img.src = `/model-images/${filename}`;
+      img.classList.add("image-option");
+
+      img.addEventListener("click", () => {
+        document.querySelectorAll(".image-option").forEach((el) =>
+          el.classList.remove("selected")
+        );
+        img.classList.add("selected");
+        selectedModel = filename;
+      });
+
+      gallery.appendChild(img);
+    });
+  } catch (err) {
+    console.error("Failed to load model images:", err);
+    gallery.innerHTML = `<p>Error loading model images</p>`;
+  }
+});
+
+// Submit selected model for try-on
+document.getElementById("submit-selection").addEventListener("click", () => {
+  const overlay = document.getElementById("image-select-overlay");
+  const preview = document.getElementById("preview-container");
+
+  if (!selectedModel) {
+    alert("Please select a model image.");
+    return;
+  }
+
+  overlay.style.display = "none";
+
+  // Show loading UI
+  preview.innerHTML = `
+    <div class="tryon-loader-wrapper">
+      <div class="fancy-loader"></div>
+      <p class="loader-text">Trying on your outfit... Please wait</p>
+    </div>
+  `;
+
+
+  fetch("/tryon/selected", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      person_id: selectedModel,
+      cloth_id: clothFullId,
+    }),
+  })
+    .then((res) => {
+      if (!res.ok) throw new Error("Try-on failed");
+      return res.blob();
+    })
+    .then((blob) => {
+      const url = URL.createObjectURL(blob);
+      preview.innerHTML = "";
+      const img = document.createElement("img");
+      img.src = url;
+      img.alt = "Try-on Result";
+      preview.appendChild(img);
+    })
+    .catch((err) => {
+      console.error(err);
+      preview.innerHTML = "<p style='color:red;'>Try-on failed. Please try again.</p>";
+    });
 });
 
 // Chatbot logic
-const chatbotPopup = document.getElementById('chatbot-popup');
-const chatbotClose = document.getElementById('chatbot-close');
-const chatbotInput = document.getElementById('chatbot-input');
-const chatbotSend = document.getElementById('chatbot-send');
-const chatbotMessages = document.getElementById('chatbot-messages');
+const chatbotPopup = document.getElementById("chatbot-popup");
+const chatbotClose = document.getElementById("chatbot-close");
+const chatbotInput = document.getElementById("chatbot-input");
+const chatbotSend = document.getElementById("chatbot-send");
+const chatbotMessages = document.getElementById("chatbot-messages");
 
-// Open chatbot on "STYLE-IT!" button click
-document.getElementById('style-button').addEventListener('click', () => {
-  chatbotPopup.style.display = 'flex';
+document.getElementById("style-button").addEventListener("click", () => {
+  chatbotPopup.style.display = "flex";
 });
-
-// Close popup
-chatbotClose.addEventListener('click', () => {
-  chatbotPopup.style.display = 'none';
+chatbotClose.addEventListener("click", () => {
+  chatbotPopup.style.display = "none";
 });
-
-// Append a message
-function appendMessage(content, sender = 'bot') {
-  const msg = document.createElement('div');
-  msg.classList.add('chatbot-message', sender);
+function appendMessage(content, sender = "bot") {
+  const msg = document.createElement("div");
+  msg.classList.add("chatbot-message", sender);
   msg.textContent = content;
   chatbotMessages.appendChild(msg);
   chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
 }
-
-// Handle send
-chatbotSend.addEventListener('click', () => {
+chatbotSend.addEventListener("click", () => {
   const userMsg = chatbotInput.value.trim();
   if (!userMsg) return;
 
-  appendMessage(userMsg, 'user');
-  chatbotInput.value = '';
+  appendMessage(userMsg, "user");
+  chatbotInput.value = "";
 
-  // Simulated response
   setTimeout(() => {
     let response = "Interesting choice!";
     const lower = userMsg.toLowerCase();
@@ -94,56 +159,11 @@ chatbotSend.addEventListener('click', () => {
       response = "Try matching it with beige pants or layered gold jewelry.";
     }
 
-    appendMessage(response, 'bot');
+    appendMessage(response, "bot");
   }, 600);
 });
-
-// Send on Enter key
-chatbotInput.addEventListener('keypress', e => {
-  if (e.key === 'Enter') chatbotSend.click();
-});
-
-document.addEventListener("DOMContentLoaded", () => {
-  const overlay = document.getElementById("image-select-overlay");
-  const openBtn = document.getElementById("select-image-button");
-  const submitBtn = document.getElementById("submit-selection");
-  const gallery = document.getElementById("image-gallery");
-  let selectedImage = null;
-
-  const imageFilenames = [
-    "00001_00.jpg", "00002_00.jpg", "00003_00.jpg",
-    "00005_00.jpg", "00006_00.jpg", "00008_00.jpg",
-    "00013_00.jpg", "00017_00.jpg", "00034_00.jpg",
-    // Add more as needed
-  ];
-
-  openBtn.addEventListener("click", () => {
-    overlay.style.display = "flex";
-    gallery.innerHTML = ""; // clear previous content
-
-    imageFilenames.forEach(filename => {
-      const img = document.createElement("img");
-      img.src = `images/${filename}`;
-      img.classList.add("image-option");
-      img.addEventListener("click", () => {
-        document.querySelectorAll(".image-option").forEach(el => el.classList.remove("selected"));
-        img.classList.add("selected");
-        selectedImage = filename;
-      });
-      gallery.appendChild(img);
-    });
-  });
-
-  submitBtn.addEventListener("click", () => {
-    if (!selectedImage) {
-      alert("Please select an image first!");
-      return;
-    }
-
-    overlay.style.display = "none";
-    console.log("Selected image:", selectedImage); // you can process/store this next
-    // You could e.g. save to localStorage, or display it in the UI
-  });
+chatbotInput.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") chatbotSend.click();
 });
 
 document.getElementById("CR-button").addEventListener("click", () => {
