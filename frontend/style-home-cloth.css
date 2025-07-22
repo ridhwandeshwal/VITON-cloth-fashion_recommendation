@@ -245,7 +245,7 @@ body{
 .load-more-button {
   margin-top: 20px;
   padding: 10px 20px;
-  background-color: #e2529f;
+  background-color: #d43088;
   color: white;
   border: none;
   border-radius: 10px;
@@ -259,22 +259,3 @@ body{
   background-color: #b42d72;
 }
 
-.recommendation-card {
-  border: 1px solid rgb(246, 174, 210);
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  background: #fdafc9;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.recommendation-card:hover {
-  transform: scale(1.05);
-  box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-}
-
-.recommendation-card img {
-  width: 100%;
-  height: auto;
-  border-radius: 10px 10px 0 0;
-  transition: opacity 0.3s ease;
-}

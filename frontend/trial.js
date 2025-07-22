@@ -1,43 +1,43 @@
-const images = [
-  { src: "00001_00.jpg", label: "ID:00001_00" },
-  { src: "00002_00.jpg", label: "ID:00002_00" },
-  { src: "00003_00.jpg", label: "ID:00003_00" },
-  { src: "00005_00.jpg", label: "ID:00005_00" },
-  { src: "00006_00.jpg", label: "ID:00006_00" },
-  { src: "00008_00.jpg", label: "ID:00008_00" },
-  { src: "00013_00.jpg", label: "ID:00013_00" },
-  { src: "00017_00.jpg", label: "ID:00017_00" },
-  { src: "00034_00.jpg", label: "ID:00034_00" },
-  { src: "00035_00.jpg", label: "ID:00035_00" },
-  { src: "00055_00.jpg", label: "ID:00055_00" },
-  { src: "00057_00.jpg", label: "ID:00057_00" },
-  { src: "00064_00.jpg", label: "ID:00064_00" },
-  { src: "00067_00.jpg", label: "ID:00067_00" },
-  { src: "00069_00.jpg", label: "ID:00069_00" },
-  { src: "00071_00.jpg", label: "ID:00071_00" },
-  { src: "00074_00.jpg", label: "ID:00074_00" },
-  { src: "00075_00.jpg", label: "ID:00075_00" },
-  // Add more filenames as you get them
+// Get recommended cloth IDs from localStorage or fallback list
+const ids = JSON.parse(localStorage.getItem('recommendedClothIDs')) || [
+  "00001_00.jpg", "00002_00.jpg", "00003_00.jpg"
 ];
+
+// Build image objects
+const images = ids.map(id => ({
+  src: id,
+  label: `ID:${id.replace('.jpg', '')}`
+}));
 
 let loadedCount = 0;
 const batchSize = 12;
 
 function loadImages() {
   const container = document.getElementById("recommendation-container");
+
   for (let i = loadedCount; i < loadedCount + batchSize && i < images.length; i++) {
     const card = document.createElement("div");
     card.className = "recommendation-card";
 
     const link = document.createElement("a");
     const id = images[i].src.replace('.jpg', '');
-    link.href = `details.html?id=${id}`;
+    link.href = `cloth-page.html?id=${id}`;
     link.style.textDecoration = 'none';
     link.style.color = 'inherit';
 
     const img = document.createElement("img");
-    img.src =  "images/" + images[i].src;
+    img.src = "images/" + images[i].src;
     img.alt = images[i].label;
+    img.dataset.id = id; // save ID for swapping
+
+    // Hover effect: change image source
+    img.addEventListener("mouseenter", () => {
+      img.src = "cloth/" + img.dataset.id + ".jpg";
+    });
+
+    img.addEventListener("mouseleave", () => {
+      img.src = "images/" + img.dataset.id + ".jpg";
+    });
 
     const label = document.createElement("p");
     label.textContent = images[i].label;
@@ -47,10 +47,12 @@ function loadImages() {
     card.appendChild(link);
     container.appendChild(card);
   }
+
   loadedCount += batchSize;
 
   if (loadedCount >= images.length) {
-    document.getElementById("load-more-button").style.display = "none";
+    const loadMoreBtn = document.getElementById("load-more-button");
+    if (loadMoreBtn) loadMoreBtn.style.display = "none";
   }
 }
 
@@ -58,3 +60,8 @@ document.getElementById("load-more-button").addEventListener("click", loadImages
 
 // Initial load
 loadImages();
+
+// // Optional: clear stored IDs after load
+// window.addEventListener("beforeunload", () => {
+//   localStorage.removeItem("recommendedClothIDs");
+// });

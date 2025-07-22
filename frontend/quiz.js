@@ -55,23 +55,32 @@ function goToNextPage() {
         }
     });
 
-    // Get existing data or initialize
+    // Store results
     const savedData = JSON.parse(localStorage.getItem('quizData') || '[]');
     savedData.push(result);
     localStorage.setItem('quizData', JSON.stringify(savedData));
 
-    const currentPage = window.location.pathname;
-    const base = currentPage.substring(0, currentPage.lastIndexOf('/'));
-    
-    const match = currentPage.match(/quiz(\d+)\.html$/);
+    // Detect current quiz number from script or URL fallback
+    const current = document.location.pathname.split('/').pop() || 'quiz1.html';
+
+    const match = current.match(/quiz(\d+)\.html/);
     if (match) {
         const currentNum = parseInt(match[1]);
         const nextNum = currentNum + 1;
-        window.location.href = `${base}/quiz${nextNum}.html`;
+        const nextPage = `quiz${nextNum}.html`;
+
+        // Forward to next quiz
+        window.location.href = `/new/${nextPage}`;
+    } else {
+        // fallback: first page
+        window.location.href = '/new/quiz1.html';
     }
 }
+
 // Submit
 function submitRatings() {
+    document.getElementById('loading-overlay').style.display = 'flex';
+
     const result = [];
     ratings.forEach(box => {
         const category = box.querySelector('.category');
@@ -85,17 +94,33 @@ function submitRatings() {
 
     const savedData = JSON.parse(localStorage.getItem('quizData') || '[]');
     savedData.push(result);
-    console.log(savedData); // <-- now logs full quiz data across all pages
+    localStorage.removeItem('quizData');
 
-    localStorage.removeItem('quizData'); // clear after submission
+    const attributeMap = ["Category", "Colour", "Material", "Pattern", "Brand"];
+    const formattedData = {};
 
-    // Send to server (uncomment when ready)
-    // fetch('http://your-api-endpoint.com/submit', {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json' },
-    //     body: JSON.stringify(savedData)
-    // })
-    // .then(res => res.json())
-    // .then(data => alert('Submitted successfully!'))
-    // .catch(err => alert('Submission failed.'));
+    for (let i = 0; i < savedData.length; i++) {
+        const entry = savedData[i];
+        const attributeName = attributeMap[i] || `Attribute${i+1}`;
+        const rankedValues = {};
+        entry.forEach(item => {
+            rankedValues[item.rating] = item.category;
+        });
+        formattedData[attributeName] = rankedValues;
+    }
+
+    fetch('/stylequiz/recommend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formattedData)
+    })
+    .then(res => res.json())
+    .then(data => {
+        localStorage.setItem('recommendedClothIDs', JSON.stringify(data.recommendations));
+        window.location.href = '/new/home-page.html';  // or just 'home-page.html' if on same folder
+    })
+    .catch(err => {
+        console.error("Submission failed:", err);
+        alert("Submission failed!");
+    });
 }

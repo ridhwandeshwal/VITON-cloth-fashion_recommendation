@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ReVeRa</title>
     <!-- CSS Files -->
-    <link rel="stylesheet" href="style-home.css">
     <link rel="stylesheet" href="style-cloth.css">
+    <link rel="stylesheet" href="style-home-cloth.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-     <div><img src="topbar.jpg" height="100%" width="100%">
+      <div><img src="topbar.jpg" height="100%" width="100%">
           <div id="home-page-logo" class="brand-logo"><img src = "brand_logo.jpg" width="100%" height="100%">
           </div>
           <a href="about-us.html" class="about-us">About Us</a>
@@ -25,3 +25,74 @@
           <div id="flower" class = "flower"><img src="flower.jpg" height = 100% width=100%>
           </div>
       </div>
+      <div class="container">
+          <div class="left-panel">
+            <input type="file" id="upload-input" accept="image/*" style="display: none;">
+            <div id="text1" class="try-on-text">
+                    WANT TO SEE HOW IT LOOKS ON YOU? <br>JUST UPLOAD A PICTURE OF YOURSELF!
+            </div>
+            <button id="try-button" class ="try-on-button">TRY IT ON!
+              <div id="camera" class="camera-img"></div>
+            </button>
+            <div class="image-box" id="selected-image-1"></div>
+            <div id="text2" class="style-text">
+                    NEED HELP STYLING THIS? <br>OUR FASHION-BOT IS HERE TO HELP!
+            </div>
+            <button id="style-button" class ="style-button">STYLE-IT!
+              <div id="mask" class="mask-img"></div>
+            </button>
+            <div id="text3" class="neural-text">
+                    BLEND YOUR FAVOURITE PIECES->
+                    <button id="select-image-button">SELECT</button>
+            </div>
+            <button id="custom-button" class ="custom">CUSTOM PIECES</button>
+            <button id="CR-button" class ="custom-rec">ARTSY RECOMMENDATIONS</button>
+        </div>
+
+
+          <div class="right-panel">
+            <div class="action-buttons">
+              <button id="wishlist-btn">♡ Add to Wishlist</button>
+              <button id="bag-btn">🛍 Add to Bag</button>
+            </div>
+            <div id="preview-container"></div>
+          </div>
+        </div>
+
+
+            <div class="recommendation-section">
+        <h2 class="section-title">SIMILAR ITEMS</h2>
+        <div class="scroll-container" id="recommendation-scroll">
+          <!-- Cards will be dynamically added here -->
+        </div>
+        <button class="scroll-button left" id="scroll-left">&#9664;</button>
+        <button class="scroll-button right" id="scroll-right">&#9654;</button>
+      </div>
+            <div id="image-select-overlay">
+        <div id="image-select-container">
+          <h2>Select a clothing piece</h2>
+          <div id="image-gallery">
+            <!-- JS will populate images here -->
+          </div>
+          <button id="submit-selection">Submit</button>
+        </div>
+      </div>
+      <!-- Chatbot Popup -->
+      <!-- Chatbot Popup -->
+      <div id="chatbot-popup">
+        <div id="chatbot-header">
+          WHAT THE FROCK?! STYLE BOT! 💬
+          <span id="chatbot-close">&times;</span>
+        </div>
+        <div id="chatbot-messages">
+          <div class="chatbot-message bot">👗 Hi there! I'm your fashion assistant. Ask me anything about styling or matching clothes!</div>
+        </div>
+        <div id="chatbot-input-container">
+          <input type="text" id="chatbot-input" placeholder="Type your message...">
+          <button id="chatbot-send">Send</button>
+        </div>
+      </div>
+      <script src="cloth.js"></script>
+      <script src="recommendation-cloth.js"></script>
+      </body>
+      </html>
