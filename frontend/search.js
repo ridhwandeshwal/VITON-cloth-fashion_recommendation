@@ -11,18 +11,32 @@ if (items.length === 0) {
     const link = document.createElement("a");
     link.href = `cloth-page.html?id=${id.replace(".jpg", "")}`;
 
-    const img = document.createElement("img");
-    img.src = `images/${id}`;
-    img.alt = id;
+    // Container to handle image swap on hover
+    const imageContainer = document.createElement("div");
+    imageContainer.className = "image-container";
+
+    const mainImg = document.createElement("img");
+    mainImg.src = `images/${id}`;
+    mainImg.alt = id;
+    mainImg.className = "main-image";
+
+    const hoverImg = document.createElement("img");
+    hoverImg.src = `cloth/${id}`;
+    hoverImg.alt = id;
+    hoverImg.className = "hover-image";
+
+    imageContainer.appendChild(mainImg);
+    imageContainer.appendChild(hoverImg);
+    link.appendChild(imageContainer);
 
     const label = document.createElement("p");
     label.textContent = id;
 
-    link.appendChild(img);
     card.appendChild(link);
     card.appendChild(label);
     container.appendChild(card);
   });
+
 }
 
 const prevQuery = localStorage.getItem("lastSearchQuery");
