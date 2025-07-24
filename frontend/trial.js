@@ -1,8 +1,14 @@
 // Get recommended cloth IDs from localStorage or fallback list
-const ids = JSON.parse(localStorage.getItem('recommendedClothIDs')) || [
+const ids = JSON.parse(localStorage.getItem('customResults')) || JSON.parse(localStorage.getItem('recommendedClothIDs')) || [
   "00001_00.jpg", "00002_00.jpg", "00003_00.jpg"
 ];
-
+console.log("working")
+if (JSON.parse(localStorage.getItem("customResults"))){
+  console.log("changing")
+  const ele = document.getElementsByClassName("banner-tagline")[0]
+  ele.innerHTML=`Your Custom Recommendations based on the Style Generated`
+  ele.style.fontFamily="Gill Sans"
+}
 // Build image objects
 const images = ids.map(id => ({
   src: id,
@@ -61,7 +67,10 @@ document.getElementById("load-more-button").addEventListener("click", loadImages
 // Initial load
 loadImages();
 
-// // Optional: clear stored IDs after load
-// window.addEventListener("beforeunload", () => {
-//   localStorage.removeItem("recommendedClothIDs");
-// });
+// Optional: clear stored IDs after load
+window.addEventListener("beforeunload", () => {
+  const ele = document.getElementsByClassName("banner-tagline")[0]
+  ele.innerHTML=`WHERE FASHION MEETS ART<br> DISCOVER YOUR SIGNATURE LOOK`
+  ele.style.fontFamily=""
+  localStorage.removeItem("customResults");
+});

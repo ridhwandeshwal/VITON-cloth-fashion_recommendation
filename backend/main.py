@@ -206,28 +206,27 @@ async def search_query(request: Request):
 @app.post("/custom_recommend")
 async def custom_recommend(request: Request):
     data = await request.json()
-
+    
     filters = {
         "Category": data.get("Category", []),
         "Pattern": data.get("Pattern", []),
-        "Color": data.get("Color", []),
+        "Colour": data.get("Colour", []),
         "Material": data.get("Material", []),
         "Occasion": data.get("Occasion", []),
         "Season": data.get("Season", []),
-        "Neckline": data.get("Neckline", []),
-        "Sleeve": data.get("Sleeve", []),
+        "NeckType": data.get("Neckline", []),
+        "SleeveLength": data.get("Sleeve", []),
     }
-
     # Map filter key to (relationship_type, label, property_name)
     schema_map = {
         "Category": ("is_category", "Category", "name"),
         "Pattern": ("has_pattern", "Pattern", "name"),
-        "Color": ("has_color", "Color", "name"),
-        "Material": ("has_material", "Material", "name"),
-        "Occasion": ("is_occasion", "Occasion", "name"),
-        "Season": ("has_season", "Season", "name"),
-        "Neckline": ("has_neckline", "Neckline", "name"),
-        "Sleeve": ("has_sleeve", "Sleeve", "name"),
+        "Colour": ("is_colour", "Colour", "name"),
+        "Material": ("of_material", "Material", "name"),
+        "Occasion": ("for_occasion", "Occasion", "name"),
+        "Season": ("for_season", "Season", "name"),
+        "NeckType": ("has_necktype", "Neckline", "name"),
+        "SleeveLength": ("has_sleevelength", "Sleeve", "length"),
     }
 
     all_ids = []
@@ -238,15 +237,17 @@ async def custom_recommend(request: Request):
         rel, label, prop = schema_map[key]
 
         for val in values:
+            print(rel,label,prop,val)
             with driver.session() as session:
                 result = session.run(
                     f"""
                     MATCH (c:Cloth)-[:{rel}]->(a:{label} {{{prop}: $val}})
-                    RETURN c.name AS cloth_id
+                    RETURN c.cloth_id AS cloth_id
                     """,
                     val=val
                 )
+                
                 all_ids.extend([r["cloth_id"] for r in result])
-
+    
     top_ids = [item for item, _ in Counter(all_ids).most_common(50)]
     return {"recommendations": top_ids}

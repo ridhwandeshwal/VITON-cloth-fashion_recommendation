@@ -198,16 +198,15 @@ chatbotInput.addEventListener("keypress", (e) => {
 
 document.getElementById("CR-button").addEventListener("click", async () => {
   const filters = {
-    Category: ["bodysuit", "leotard"],
-    Pattern: ["floral"],
-    Color: ["white"],
-    Material: ["mesh"],
-    Occasion: ["casual"],
-    Season: ["summer"],
-    Neckline: ["deep neck"],
-    Sleeve: ["thin sleeve", "sleeveless"]
+    Category: ["Bodysuit/Leotard"],
+    Pattern: ["Floral"],
+    Colour: ["White"],
+    Material: ["Mesh"],
+    Occasion: ["Casual"],
+    Season: ["Summer"],
+    NeckType: ["Deep"],
+    SleeveLength: ["Sleeveless"]
   };
-
   try {
     const res = await fetch("/custom_recommend", {
       method: "POST",
