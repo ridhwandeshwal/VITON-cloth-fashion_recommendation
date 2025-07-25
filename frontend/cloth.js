@@ -177,7 +177,7 @@ chatbotSend.addEventListener("click", () => {
 
 Remember to have fun and enjoy the night out! 🎉🎉🎉
 `;
-    // let response ="🧠 Styling Advice:\n🎉 Vibe Summary: Bold & Glam Night Out 🌟\n👖 Bottoms: Black leather pants\n👟 Footwear: High heels\n🧥 Outerwear: Statement blazer\n💄 Makeup: Bold lipstick and smoky eyes\n💇 Hairstyle: Sleek straight hair\n💍 Accessories: Sparkly earrings and clutch bag"
+    // Chatbot could not be included due to system requirements, check fashio-bot.ipynb in the root dir for it's implementation
 
     const lower = userMsg.toLowerCase();
 
