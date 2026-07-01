@@ -2,44 +2,52 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Rate Your Favorite Categories</title>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Style Quiz · Colours — ReVeRa</title>
+  <link rel="stylesheet" href="theme.css" />
   <link rel="stylesheet" href="quiz.css" />
 </head>
 <body>
-  <div><img src="topbar.jpg" height="100%" width="100%">
-          <div id="style-page-logo" class="brand-logo"><img src = "brand_logo.jpg" width="100%" height="100%">
-          </div>
-          <div id="flower" class = "flower"><img src="flower.jpg" height = 100% width=100%>
-          </div>
-    
-  </div>
-  <h1>WHAT COLOURS COMPLEMENT YOU BEST?</h1>
+  <header class="site-header">
+    <a class="brand" href="home-page.html">Re<span>Ve</span>Ra</a>
+    <nav class="site-nav">
+      <a href="home-page.html">Home</a>
+      <a href="about-us.html">About</a>
+    </nav>
+  </header>
 
-  <div class="rating-boxes">
-    <div class="rating" data-rating="1">RATING 1 ⭐</div>
-    <div class="rating" data-rating="2">RATING 2 ⭐</div>
-    <div class="rating" data-rating="3">RATING 3 ⭐</div>
-    <div class="rating" data-rating="4">RATING 4 ⭐</div>
-    <div class="rating" data-rating="5">RATING 5 ⭐</div>
-  </div>
+  <main class="quiz-main">
+    <p class="quiz-step">Step 2 of 5</p>
+    <h1>What colours complement you best?</h1>
+    <p class="quiz-hint">Drag each option into a rating — the higher the rating, the more you love it.</p>
 
-  <div class="categories">
-    <div class="category" draggable="true">Black</div>
-    <div class="category" draggable="true">White</div>
-    <div class="category" draggable="true">Pink</div>
-    <div class="category" draggable="true">Red</div>
-    <div class="category" draggable="true">Yellow</div>
-    <div class="category" draggable="true">Gray</div>
-    <div class="category" draggable="true">Teal</div>
-    <div class="category" draggable="true">Green</div>
-    <div class="category" draggable="true">Orange</div>
-    <div class="category" draggable="true">Blue</div>
-    <div class="category" draggable="true">Purple</div>
-  </div>
-  <div class="button-container">
-     <button onclick="goToNextPage()">Next</button>
-  </div>
+    <div class="rating-boxes">
+      <div class="rating" data-rating="1">RATING 1 ⭐</div>
+      <div class="rating" data-rating="2">RATING 2 ⭐</div>
+      <div class="rating" data-rating="3">RATING 3 ⭐</div>
+      <div class="rating" data-rating="4">RATING 4 ⭐</div>
+      <div class="rating" data-rating="5">RATING 5 ⭐</div>
+    </div>
+
+    <div class="categories">
+      <div class="category" draggable="true">Black</div>
+      <div class="category" draggable="true">White</div>
+      <div class="category" draggable="true">Pink</div>
+      <div class="category" draggable="true">Red</div>
+      <div class="category" draggable="true">Yellow</div>
+      <div class="category" draggable="true">Gray</div>
+      <div class="category" draggable="true">Teal</div>
+      <div class="category" draggable="true">Green</div>
+      <div class="category" draggable="true">Orange</div>
+      <div class="category" draggable="true">Blue</div>
+      <div class="category" draggable="true">Purple</div>
+    </div>
+
+    <div class="button-container">
+      <button onclick="goToNextPage()">Next</button>
+    </div>
+  </main>
+
   <script src="quiz.js"></script>
 </body>
 </html>

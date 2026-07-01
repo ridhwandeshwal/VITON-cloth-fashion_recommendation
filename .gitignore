@@ -1,1 +1,21 @@
+# Environments / secrets
+.env
+.env.*
+!.env.example
 *env
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Model weights / generated artifacts
+*.pth
+*.ckpt
+*.h5
+stylized_image.jpeg
+
+# IDE
+.vscode/
+.idea/

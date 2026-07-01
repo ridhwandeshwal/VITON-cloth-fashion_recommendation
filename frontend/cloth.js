@@ -18,29 +18,129 @@ if (id) {
   document.getElementById("selected-image-1").textContent = "No item selected.";
 }
 
-// Restore file upload functionality
+function showPersonPreview(url) {
+  const box = document.getElementById("selected-image-1");
+  box.style.backgroundImage = `url('${url}')`;
+  box.style.backgroundSize = "cover";
+  box.style.backgroundPosition = "center";
+  box.textContent = "";
+}
+
+async function runTryOnWithPhoto(blob) {
+  if (!clothFullId) {
+    alert("No item selected to try on.");
+    return;
+  }
+  const preview = document.getElementById("preview-container");
+  preview.innerHTML = `
+    <div class="tryon-loader-wrapper">
+      <div class="fancy-loader"></div>
+      <p class="loader-text">Trying on your outfit... Please wait</p>
+    </div>
+  `;
+
+  const formData = new FormData();
+  formData.append("person_img", blob, "person.jpg");
+  formData.append("cloth_id", clothFullId);
+
+  try {
+    const res = await fetch("/vton", { method: "POST", body: formData });
+    if (!res.ok) throw new Error("Request failed");
+    const resultBlob = await res.blob();
+    const url = URL.createObjectURL(resultBlob);
+    preview.innerHTML = "";
+    const img = document.createElement("img");
+    img.src = url;
+    img.alt = "Result Image";
+    preview.appendChild(img);
+  } catch (err) {
+    console.error(err);
+    preview.innerHTML = `<p style='color:red;'>Try-on failed. Please try again.</p>`;
+  }
+}
+
+// Upload a photo of yourself for try-on
 const fileInput = document.getElementById("upload-input");
-fileInput.addEventListener("change", function () {
-  if (fileInput.files.length > 0) {
-    alert("Image selected: " + fileInput.files[0].name);
-  }
+document.getElementById("upload-photo-btn").addEventListener("click", () => {
+  fileInput.click();
 });
-document.getElementById("upload-input").addEventListener("change", (event) => {
+fileInput.addEventListener("change", (event) => {
   const file = event.target.files[0];
-  if (file) {
-    const reader = new FileReader();
-    reader.onload = function (e) {
-      const img = document.createElement("img");
-      img.src = e.target.result;
-      const preview = document.getElementById("preview-container");
-      preview.innerHTML = "";
-      preview.appendChild(img);
-    };
-    reader.readAsDataURL(file);
-  }
+  if (!file) return;
+  selectedModel = null;
+  showPersonPreview(URL.createObjectURL(file));
+  runTryOnWithPhoto(file);
 });
 
-// Open image selector from TRY IT ON
+// Take a photo with the camera for try-on
+let cameraStream = null;
+
+async function openCamera() {
+  const overlay = document.getElementById("camera-overlay");
+  const video = document.getElementById("camera-video");
+  const canvas = document.getElementById("camera-canvas");
+
+  overlay.style.display = "flex";
+  video.style.display = "block";
+  canvas.style.display = "none";
+  document.getElementById("camera-capture").style.display = "inline-block";
+  document.getElementById("camera-retake").style.display = "none";
+  document.getElementById("camera-use").style.display = "none";
+
+  try {
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+    video.srcObject = cameraStream;
+  } catch (err) {
+    console.error("Camera access failed:", err);
+    alert("Couldn't access your camera. Check browser permissions and try again.");
+    closeCamera();
+  }
+}
+
+function closeCamera() {
+  document.getElementById("camera-overlay").style.display = "none";
+  if (cameraStream) {
+    cameraStream.getTracks().forEach((track) => track.stop());
+    cameraStream = null;
+  }
+}
+
+document.getElementById("camera-btn").addEventListener("click", openCamera);
+document.getElementById("camera-cancel").addEventListener("click", closeCamera);
+
+document.getElementById("camera-capture").addEventListener("click", () => {
+  const video = document.getElementById("camera-video");
+  const canvas = document.getElementById("camera-canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video, 0, 0);
+
+  video.style.display = "none";
+  canvas.style.display = "block";
+  document.getElementById("camera-capture").style.display = "none";
+  document.getElementById("camera-retake").style.display = "inline-block";
+  document.getElementById("camera-use").style.display = "inline-block";
+});
+
+document.getElementById("camera-retake").addEventListener("click", () => {
+  document.getElementById("camera-video").style.display = "block";
+  document.getElementById("camera-canvas").style.display = "none";
+  document.getElementById("camera-capture").style.display = "inline-block";
+  document.getElementById("camera-retake").style.display = "none";
+  document.getElementById("camera-use").style.display = "none";
+});
+
+document.getElementById("camera-use").addEventListener("click", () => {
+  const canvas = document.getElementById("camera-canvas");
+  canvas.toBlob((blob) => {
+    selectedModel = null;
+    showPersonPreview(URL.createObjectURL(blob));
+    closeCamera();
+    runTryOnWithPhoto(blob);
+  }, "image/jpeg", 0.92);
+});
+
+// Open image selector from PICK A MODEL
 document.getElementById("try-button").addEventListener("click", async () => {
   triggerSource = "tryon";
   openModelSelector();
@@ -197,22 +297,15 @@ chatbotInput.addEventListener("keypress", (e) => {
 });
 
 document.getElementById("CR-button").addEventListener("click", async () => {
-  const filters = {
-    Category: ["Bodysuit/Leotard"],
-    Pattern: ["Floral"],
-    Colour: ["White"],
-    Material: ["Mesh"],
-    Occasion: ["Casual"],
-    Season: ["Summer"],
-    NeckType: ["Deep"],
-    SleeveLength: ["Sleeveless"]
-  };
+  if (!clothFullId) {
+    alert("No item selected to base recommendations on.");
+    return;
+  }
   try {
-    const res = await fetch("/custom_recommend", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(filters),
-    });
+    // Recommend items sharing attributes (colour, pattern, category, etc.)
+    // with the garment currently being viewed.
+    const res = await fetch(`/recommend/${encodeURIComponent(clothFullId)}`);
+    if (!res.ok) throw new Error(`Request failed with status ${res.status}`);
 
     const data = await res.json();
     const ids = data.recommendations || [];
@@ -220,7 +313,7 @@ document.getElementById("CR-button").addEventListener("click", async () => {
     localStorage.setItem("customResults", JSON.stringify(ids));
     window.location.href = "home-page.html";
   } catch (err) {
-    alert("Could not fetch custom recommendations.");
+    alert("Could not fetch recommendations.");
     console.error(err);
   }
 });

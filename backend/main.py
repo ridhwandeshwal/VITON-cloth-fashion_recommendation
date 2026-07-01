@@ -1,28 +1,58 @@
-from fastapi import FastAPI, File, UploadFile, Form, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-import shutil
-import os
-import subprocess
-import sys
 import glob
-
-from backend.utils.run_kaggle import run_vton_pipeline
-from backend.utils.recommendation import generate_recommendations
-from backend.utils.quiz_recommender import generate_quiz_recommendations
-
-from fastapi import FastAPI, Request
+import logging
+import os
 from collections import Counter
-from neo4j import GraphDatabase
+from contextlib import asynccontextmanager
+
+import httpx
 import spacy
+from dotenv import load_dotenv
+from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from spacy.matcher import Matcher
 
+from backend.utils.db import close_driver, get_database, get_driver
+from backend.utils.modal_client import ModalNotConfiguredError, call_style_transfer
+from backend.utils.quiz_recommender import generate_quiz_recommendations
+from backend.utils.recommendation import generate_recommendations
+from backend.utils.run_kaggle import describe_garment, run_vton_pipeline
 
-app = FastAPI()
+load_dotenv()
 
-app.mount("/static", StaticFiles(directory="backend/static"), name="static")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
+
+HD_VITON_DIR = os.environ.get("HD_VITON_DIR", "backend/HD-ViTON/VITON-HD")
+MODEL_IMAGE_DIR = os.path.join(HD_VITON_DIR, "datasets", "test", "image")
+CLOTH_DIR = "frontend/cloth"
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    get_driver()
+    logger.info("Neo4j driver initialized")
+    yield
+    close_driver()
+    logger.info("Neo4j driver closed")
+
+
+app = FastAPI(lifespan=lifespan)
+
+cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",")]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.mount("/new", StaticFiles(directory="frontend"), name="frontend")
-app.mount("/model-images", StaticFiles(directory="backend/HD-VITON/VITON-HD/datasets/test/image"), name="model-images")
+app.mount("/model-images", StaticFiles(directory=MODEL_IMAGE_DIR), name="model-images")
+
 
 @app.get("/", response_class=HTMLResponse)
 def home():
@@ -30,136 +60,131 @@ def home():
         content = f.read().decode("utf-8", errors="replace")
     return HTMLResponse(content=content)
 
+
 @app.post("/vton")
-async def tryon(person_img: UploadFile = File(...), cloth_img: UploadFile = File(...)):
-    person_path = f"backend/static/{person_img.filename}"
-    cloth_path = f"backend/static/{cloth_img.filename}"
+async def tryon(person_img: UploadFile = File(...), cloth_id: str = Form(...)):
+    """Try-on for an arbitrary uploaded/captured person photo (IDM-VTON needs
+    no precomputed data, so this works the same as /tryon/selected — the
+    garment is still looked up by id, only the person photo is uploaded)."""
+    cloth_path = os.path.join(CLOTH_DIR, cloth_id)
+    if not os.path.exists(cloth_path):
+        raise HTTPException(status_code=404, detail=f"Cloth image not found: {cloth_id}")
 
-    with open(person_path, "wb") as buffer:
-        shutil.copyfileobj(person_img.file, buffer)
-    with open(cloth_path, "wb") as buffer:
-        shutil.copyfileobj(cloth_img.file, buffer)
+    person_bytes = await person_img.read()
+    with open(cloth_path, "rb") as f:
+        cloth_bytes = f.read()
 
-    output_path = run_vton_pipeline(person_path, cloth_path)
-    return FileResponse(output_path, media_type="image/png")
+    driver = get_driver()
+    garment_des, category = describe_garment(cloth_id, driver, get_database())
+
+    try:
+        result = await run_vton_pipeline(person_bytes, cloth_bytes, garment_des, category)
+    except ModalNotConfiguredError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except httpx.HTTPStatusError as e:
+        logger.exception("Modal try-on call failed")
+        raise HTTPException(status_code=502, detail=f"Try-on pipeline failed: {e}")
+
+    return Response(content=result, media_type="image/png")
 
 
 @app.get("/recommend/{cloth_id}")
 def recommend(cloth_id: str):
-    # print("it hit")
-    recommendations=generate_recommendations(cloth_id)
-    return {"recommendations": recommendations}
-
+    return {"recommendations": generate_recommendations(cloth_id)}
 
 
 @app.post("/stylequiz/recommend")
-async def style_quiz_recommendation(request: Request):
-    data = await request.json()
-    recommendations = generate_quiz_recommendations(data)
-    return {"recommendations": recommendations}
+async def style_quiz_recommendation(data: dict):
+    return {"recommendations": generate_quiz_recommendations(data)}
 
 
-HD_VITON_DIR = "backend/HD-ViTON/VITON-HD"
-PAIRS_FILE = os.path.join(HD_VITON_DIR, "datasets","test_pairs.txt")
 @app.post("/tryon/selected")
 async def run_selected_tryon(person_id: str = Form(...), cloth_id: str = Form(...)):
+    person_path = os.path.join(MODEL_IMAGE_DIR, person_id)
+    cloth_path = os.path.join(CLOTH_DIR, cloth_id)
+
+    if not os.path.exists(person_path):
+        raise HTTPException(status_code=404, detail=f"Model image not found: {person_id}")
+    if not os.path.exists(cloth_path):
+        raise HTTPException(status_code=404, detail=f"Cloth image not found: {cloth_id}")
+
+    with open(person_path, "rb") as f:
+        person_bytes = f.read()
+    with open(cloth_path, "rb") as f:
+        cloth_bytes = f.read()
+
+    driver = get_driver()
+    garment_des, category = describe_garment(cloth_id, driver, get_database())
+
     try:
-        # Write the selected pair to test_pairs.txt
-        with open(PAIRS_FILE, "w") as f:
-            f.write(f"{person_id} {cloth_id}\n")
+        result = await run_vton_pipeline(person_bytes, cloth_bytes, garment_des, category)
+    except ModalNotConfiguredError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except httpx.HTTPStatusError as e:
+        logger.exception("Modal try-on call failed")
+        raise HTTPException(status_code=502, detail=f"Try-on pipeline failed: {e}")
 
-        # Run test.py for try-on
-        subprocess.run(
-            [sys.executable, "test.py", "--name", "results"],
-            cwd=HD_VITON_DIR,
-            check=True,
-            env={**os.environ, "CUDA_VISIBLE_DEVICES": "0"}
-        )
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-    # Result file name format
-    person_base = person_id.replace("_00.jpg", "")
-    result_filename = f"{person_base}_{cloth_id}"
-    result_path = os.path.join(HD_VITON_DIR, "results", "results", result_filename)
-
-    if not os.path.exists(result_path):
-        return JSONResponse(status_code=404, content={"message": f"Try-on result not found: {result_filename}"})
-
-    return FileResponse(result_path, media_type="image/jpeg")
+    return Response(content=result, media_type="image/png")
 
 
-STYLETRANSFERDIR="backend/neural style tranfer trial/Neural-Style-Transfer"
 @app.post("/styletransfer/selected")
 async def run_selected_styletransfer(person_id: str = Form(...), cloth_id: str = Form(...)):
+    content_path = os.path.join(CLOTH_DIR, cloth_id)
+    style_path = os.path.join(MODEL_IMAGE_DIR, person_id)
+
+    if not os.path.exists(content_path):
+        raise HTTPException(status_code=404, detail=f"Cloth image not found: {cloth_id}")
+    if not os.path.exists(style_path):
+        raise HTTPException(status_code=404, detail=f"Model image not found: {person_id}")
+
+    with open(content_path, "rb") as f:
+        content_bytes = f.read()
+    with open(style_path, "rb") as f:
+        style_bytes = f.read()
+
     try:
-        # Run test.py for try-on
-        print("came here")
-        subprocess.run(
-            [sys.executable, "Main.py"],
-            cwd=STYLETRANSFERDIR,
-            check=True,
-            env={
-                **os.environ,
-                "CUDA_VISIBLE_DEVICES": "0",
-                "CONTENT_IMG": f"D:/trial website/frontend/cloth/{cloth_id}",
-                "STYLE_IMG": f"D:/trial website/frontend/cloth/{person_id}"
-            }
-        )
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        result = await call_style_transfer(content_bytes, style_bytes)
+    except ModalNotConfiguredError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except httpx.HTTPStatusError as e:
+        logger.exception("Modal style transfer call failed")
+        raise HTTPException(status_code=502, detail=f"Style transfer failed: {e}")
 
-    # Result file name format
-    result_filename = "stylized_image.jpeg"
-    result_path = os.path.join(STYLETRANSFERDIR, result_filename)
-
-    if not os.path.exists(result_path):
-        return JSONResponse(status_code=404, content={"message": f"Try-on result not found: {result_filename}"})
-
-    return FileResponse(result_path, media_type="image/jpeg")
-
+    return Response(content=result, media_type="image/jpeg")
 
 
 @app.get("/models")
 def list_model_images():
-    model_folder = "backend/HD-ViTON/VITON-HD/datasets/test/image"
-    image_files = glob.glob(os.path.join(model_folder, "*.jpg"))
-    filenames = [os.path.basename(f) for f in image_files]
-    return {"models": filenames}
+    image_files = glob.glob(os.path.join(MODEL_IMAGE_DIR, "*.jpg"))
+    return {"models": [os.path.basename(f) for f in image_files]}
 
 
-def NER(query):
-    nlp = spacy.blank("en")
-    matcher = Matcher(nlp.vocab)
+COLORS = ["Blue", "Red", "Green", "Yellow", "Black", "White", "Teal", "Orange", "Maroon", "Purple", "Pink", "Gray"]
+PATTERNS = ["Floral", "Striped", "Plain", "Polka", "Animal", "Graphic"]
+CATEGORIES = ["Top", "T-shirt", "BodySuit", "Dress", "Tank-Top", "Tube-Top"]
+MATERIALS = ["Cotton", "Sequin", "Silky", "Mesh", "Synthetic"]
+BRANDS = ["Tommy Hilfiger", "Calvin Klein", "Levis", "Polo", "Nike", "Adidas", "Superdry", "Puma", "Gap"]
 
-    colors = ["Blue", "Red", "Green", "Yellow", "Black", "White", "Teal", "Orange", "Maroon", "Purple", "Pink", "Gray"]
-    patterns = ["Floral", "Striped", "Plain", "Polka", "Animal", "Graphic"]
-    category = ["Top", "T-shirt", "BodySuit", "Dress", "Tank-Top", "Tube-Top"]
-    material = ["Cotton", "Sequin", "Silky", "Mesh", "Synthetic"]
-    brands = ["Tommy Hilfiger", "Calvin Klein", "Levis", "Polo", "Nike", "Adidas", "Superdry", "Puma", "Gap"]
+_nlp = spacy.blank("en")
+_matcher = Matcher(_nlp.vocab)
+_matcher.add("Color", [[{"LOWER": c.lower()}] for c in COLORS])
+_matcher.add("Pattern", [[{"LOWER": p.lower()}] for p in PATTERNS])
+_matcher.add("Category", [[{"LOWER": c.lower()}] for c in CATEGORIES])
+_matcher.add("Material", [[{"LOWER": m.lower()}] for m in MATERIALS])
+_matcher.add("Brand", [[{"LOWER": b.lower()}] for b in BRANDS])
 
-    matcher.add("Color", [[{"LOWER": color.lower()}] for color in colors])
-    matcher.add("Pattern", [[{"LOWER": p.lower()}] for p in patterns])
-    matcher.add("Category", [[{"LOWER": c.lower()}] for c in category])
-    matcher.add("Material", [[{"LOWER": m.lower()}] for m in material])
-    matcher.add("Brand", [[{"LOWER": b.lower()}] for b in brands])
 
-    doc = nlp(query.lower())
-    matches = matcher(doc)
-    entities= {"Color": [], "Category": [], "Pattern": [], "Material": [], "Brand": []}
+def NER(query: str) -> dict[str, list[str]]:
+    doc = _nlp(query.lower())
+    matches = _matcher(doc)
+    entities: dict[str, list[str]] = {"Color": [], "Category": [], "Pattern": [], "Material": [], "Brand": []}
     for match_id, start, end in matches:
-        label = nlp.vocab.strings[match_id]
+        label = _nlp.vocab.strings[match_id]
         span = doc[start:end]
         if span.text not in entities[label]:
             entities[label].append(span.text)
-    print(entities)
     return entities
 
-def connection():
-    return GraphDatabase.driver(
-        uri="neo4j+s://ee387fa4.databases.neo4j.io",
-        auth=("neo4j", "oYXGQuZbCWC2VyJ65RAzSPnjq6f2WJwodZfokuEfWm8")
-    )
 
 RELATIONSHIP_MAP = {
     "Color": ("is_colour", "Colour", "name"),
@@ -169,14 +194,16 @@ RELATIONSHIP_MAP = {
     "Brand": ("of_brand", "Brand", "name"),
 }
 
-@app.post("/usersearch")
-async def search_query(request: Request):
-    data = await request.json()
-    query = data.get("query")
-    entitydict = NER(query)
-    all_matches = []
 
-    driver = connection()
+class SearchRequest(BaseModel):
+    query: str
+
+
+@app.post("/usersearch")
+async def search_query(request: SearchRequest):
+    entitydict = NER(request.query)
+    all_matches = []
+    driver = get_driver()
 
     for entity_type, values in entitydict.items():
         if entity_type not in RELATIONSHIP_MAP:
@@ -185,39 +212,35 @@ async def search_query(request: Request):
         rel, label, prop = RELATIONSHIP_MAP[entity_type]
 
         for val in values:
-            val=val[:1].upper() + val[1:]
-            print(label,prop,rel,val)
+            val = val[:1].upper() + val[1:]
             records, _, _ = driver.execute_query(
                 f"""
                 MATCH (n:{label} {{{prop}: $value}})<-[:{rel}]-(cloth:Cloth)
                 RETURN cloth.cloth_id AS id
                 """,
                 value=val,
-                database_="neo4j"
+                database_=get_database(),
             )
             all_matches.extend([row["id"] for row in records])
-    print(all_matches)
+
     counter = Counter(all_matches)
     top_50_ids = [item for item, _ in counter.most_common(50)]
     return {"recommendations": top_50_ids}
 
 
+class CustomRecommendRequest(BaseModel):
+    Category: list[str] = []
+    Pattern: list[str] = []
+    Colour: list[str] = []
+    Material: list[str] = []
+    Occasion: list[str] = []
+    Season: list[str] = []
+    Neckline: list[str] = []
+    Sleeve: list[str] = []
+
 
 @app.post("/custom_recommend")
-async def custom_recommend(request: Request):
-    data = await request.json()
-    
-    filters = {
-        "Category": data.get("Category", []),
-        "Pattern": data.get("Pattern", []),
-        "Colour": data.get("Colour", []),
-        "Material": data.get("Material", []),
-        "Occasion": data.get("Occasion", []),
-        "Season": data.get("Season", []),
-        "NeckType": data.get("Neckline", []),
-        "SleeveLength": data.get("Sleeve", []),
-    }
-    # Map filter key to (relationship_type, label, property_name)
+async def custom_recommend(filters: CustomRecommendRequest):
     schema_map = {
         "Category": ("is_category", "Category", "name"),
         "Pattern": ("has_pattern", "Pattern", "name"),
@@ -225,29 +248,27 @@ async def custom_recommend(request: Request):
         "Material": ("of_material", "Material", "name"),
         "Occasion": ("for_occasion", "Occasion", "name"),
         "Season": ("for_season", "Season", "name"),
-        "NeckType": ("has_necktype", "Neckline", "name"),
-        "SleeveLength": ("has_sleevelength", "Sleeve", "length"),
+        "Neckline": ("has_necktype", "Neckline", "name"),
+        "Sleeve": ("has_sleevelength", "Sleeve", "length"),
     }
 
     all_ids = []
-    driver=connection()
-    for key, values in filters.items():
-        if key not in schema_map:
+    driver = get_driver()
+    for key, values in filters.model_dump().items():
+        if key not in schema_map or not values:
             continue
         rel, label, prop = schema_map[key]
 
         for val in values:
-            print(rel,label,prop,val)
-            with driver.session() as session:
-                result = session.run(
-                    f"""
-                    MATCH (c:Cloth)-[:{rel}]->(a:{label} {{{prop}: $val}})
-                    RETURN c.cloth_id AS cloth_id
-                    """,
-                    val=val
-                )
-                
-                all_ids.extend([r["cloth_id"] for r in result])
-    
+            records, _, _ = driver.execute_query(
+                f"""
+                MATCH (c:Cloth)-[:{rel}]->(a:{label} {{{prop}: $val}})
+                RETURN c.cloth_id AS cloth_id
+                """,
+                val=val,
+                database_=get_database(),
+            )
+            all_ids.extend([r["cloth_id"] for r in records])
+
     top_ids = [item for item, _ in Counter(all_ids).most_common(50)]
     return {"recommendations": top_ids}
