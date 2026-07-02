@@ -1,0 +1,45 @@
+name: Deploy ReVeRa
+
+# Auto build + redeploy on every push to master.
+# Runs on a host-mode Gitea Act Runner registered on the deploy laptop, so it
+# uses that machine's Docker daemon and its manually-populated asset dirs.
+#
+# Machine-specific config lives in the repo Actions variable DEPLOY_HOME
+# (Settings -> Actions -> Variables), NOT in this file. Set it to the absolute
+# path of the existing checkout on the laptop that already holds:
+#   <DEPLOY_HOME>/.env               real secrets (gitignored, host-only)
+#   <DEPLOY_HOME>/frontend/cloth     1.3G garment images (gitignored)
+#   <DEPLOY_HOME>/frontend/images    1.5G product images (gitignored)
+# Those three are bind-mounted at run time because they are not in the repo.
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: revera-deploy
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t revera:latest .
+
+      - name: Restart container
+        run: |
+          docker rm -f revera 2>/dev/null || true
+          docker run -d --name revera --restart unless-stopped \
+            -p 80:8000 \
+            --env-file "${{ vars.DEPLOY_HOME }}/.env" \
+            -v "${{ vars.DEPLOY_HOME }}/frontend/cloth:/app/frontend/cloth:ro" \
+            -v "${{ vars.DEPLOY_HOME }}/frontend/images:/app/frontend/images:ro" \
+            revera:latest
+
+      - name: Prune dangling images
+        run: docker image prune -f
+
+      - name: Health check
+        run: |
+          sleep 5
+          curl -fsS http://localhost/healthz
