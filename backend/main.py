@@ -50,6 +50,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def revalidate_static_assets(request, call_next):
+    """Serve the frontend with `Cache-Control: no-cache` so browsers always
+    revalidate against the server's ETag. Without this, updated HTML/CSS can
+    load while a stale cached JS keeps running (buttons render but their
+    handlers are the old ones). Assets are still cached; they just can't be
+    used without a quick 304 check, so deploys take effect immediately."""
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.startswith("/new"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 app.mount("/new", StaticFiles(directory="frontend"), name="frontend")
 app.mount("/model-images", StaticFiles(directory=MODEL_IMAGE_DIR), name="model-images")
 
@@ -59,6 +73,13 @@ def home():
     with open("frontend/style-quiz-page.html", "rb") as f:
         content = f.read().decode("utf-8", errors="replace")
     return HTMLResponse(content=content)
+
+
+@app.get("/healthz")
+def healthz():
+    """Liveness probe for reverse proxies / process managers. Deliberately
+    does not touch Neo4j or Modal so it stays fast and independent of them."""
+    return {"status": "ok"}
 
 
 @app.post("/vton")
@@ -98,6 +119,34 @@ async def style_quiz_recommendation(data: dict):
     return {"recommendations": generate_quiz_recommendations(data)}
 
 
+# Popular preset used to seed recommendations for users who skip the cold-start
+# quiz. Ranks follow the quiz semantics (rank 1 = highest weight). Colour is
+# left out on purpose: weighting any single colour makes the top results
+# collapse to that colour, so we let category/pattern/material drive a naturally
+# mixed-colour spread.
+DEFAULT_QUIZ_PROFILE = {
+    "Category": {"1": "Dress", "2": "T-shirt", "3": "Top"},
+    "Pattern": {"1": "Floral", "2": "Plain", "3": "Striped"},
+    "Material": {"1": "Cotton", "2": "Silky", "3": "Sequin"},
+}
+
+
+@app.get("/stylequiz/default")
+def style_quiz_default():
+    """Default recommendations for visitors who skip the style quiz. Uses a
+    popular preset profile so the home page is never empty, and falls back to a
+    sample of the catalog if the graph yields nothing (e.g. Neo4j unavailable)."""
+    try:
+        recs = generate_quiz_recommendations(DEFAULT_QUIZ_PROFILE)
+    except Exception:
+        logger.exception("Default quiz recommendation failed; falling back to catalog sample")
+        recs = []
+    if not recs:
+        cloth_files = sorted(glob.glob(os.path.join(CLOTH_DIR, "*.jpg")))
+        recs = [os.path.basename(f) for f in cloth_files[:50]]
+    return {"recommendations": recs}
+
+
 @app.post("/tryon/selected")
 async def run_selected_tryon(person_id: str = Form(...), cloth_id: str = Form(...)):
     person_path = os.path.join(MODEL_IMAGE_DIR, person_id)
@@ -128,14 +177,17 @@ async def run_selected_tryon(person_id: str = Form(...), cloth_id: str = Form(..
 
 
 @app.post("/styletransfer/selected")
-async def run_selected_styletransfer(person_id: str = Form(...), cloth_id: str = Form(...)):
-    content_path = os.path.join(CLOTH_DIR, cloth_id)
-    style_path = os.path.join(MODEL_IMAGE_DIR, person_id)
+async def run_selected_styletransfer(content_id: str = Form(...), style_id: str = Form(...)):
+    """Neural style transfer blends two garments: the garment currently being
+    viewed (content) with another garment chosen as the style reference. Both
+    images come from the cloth catalog."""
+    content_path = os.path.join(CLOTH_DIR, content_id)
+    style_path = os.path.join(CLOTH_DIR, style_id)
 
     if not os.path.exists(content_path):
-        raise HTTPException(status_code=404, detail=f"Cloth image not found: {cloth_id}")
+        raise HTTPException(status_code=404, detail=f"Cloth image not found: {content_id}")
     if not os.path.exists(style_path):
-        raise HTTPException(status_code=404, detail=f"Model image not found: {person_id}")
+        raise HTTPException(status_code=404, detail=f"Cloth image not found: {style_id}")
 
     with open(content_path, "rb") as f:
         content_bytes = f.read()
@@ -157,6 +209,14 @@ async def run_selected_styletransfer(person_id: str = Form(...), cloth_id: str =
 def list_model_images():
     image_files = glob.glob(os.path.join(MODEL_IMAGE_DIR, "*.jpg"))
     return {"models": [os.path.basename(f) for f in image_files]}
+
+
+@app.get("/cloths")
+def list_cloth_images():
+    """Sample of the garment catalog, used as style references for neural
+    style transfer."""
+    image_files = sorted(glob.glob(os.path.join(CLOTH_DIR, "*.jpg")))
+    return {"cloths": [os.path.basename(f) for f in image_files[:60]]}
 
 
 COLORS = ["Blue", "Red", "Green", "Yellow", "Black", "White", "Teal", "Orange", "Maroon", "Purple", "Pink", "Gray"]

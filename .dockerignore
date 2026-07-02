@@ -1,0 +1,15 @@
+.git
+.venv
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+.env
+.env.*
+!.env.example
+
+.pytest_cache/
+.vscode/
+.idea/
+
+modal_apps/__pycache__/

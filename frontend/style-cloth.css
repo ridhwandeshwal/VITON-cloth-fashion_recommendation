@@ -239,6 +239,7 @@
 }
 
 #image-select-container {
+  position: relative;
   background: var(--surface);
   border-radius: var(--r);
   padding: 1.6rem;
@@ -248,9 +249,68 @@
   box-shadow: var(--sh);
 }
 
+.select-back {
+  position: absolute;
+  top: 1.2rem;
+  left: 1.2rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  transition: all 0.2s;
+  z-index: 1;
+}
+
+.select-back:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 #image-select-container h2 {
   text-align: center;
   margin-bottom: 1.2rem;
+}
+
+.nst-role-toggle {
+  display: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem 1.2rem;
+  margin-bottom: 1.2rem;
+  padding: 0.8rem 1rem;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  font-size: 0.88rem;
+  color: var(--ink);
+}
+
+.nst-role-toggle .nst-role-label {
+  width: 100%;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+}
+
+.nst-role-toggle label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+.nst-role-toggle input {
+  accent-color: var(--accent);
 }
 
 #image-gallery {

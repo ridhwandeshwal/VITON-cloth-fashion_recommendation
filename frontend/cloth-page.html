@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ReVeRa — Try On</title>
+    <title>ReVeRa - Try On</title>
     <link rel="stylesheet" href="theme.css">
     <link rel="stylesheet" href="style-cloth.css">
     <link rel="stylesheet" href="style-home-cloth.css">
@@ -17,7 +17,7 @@
       <a href="about-us.html">About</a>
     </nav>
     <div class="header-search">
-      <input type="text" placeholder="Search styles…" class="search-box" id="search-input">
+      <input type="text" placeholder="Search styles…" class="search-box" id="search-input" autocomplete="off">
       <button type="submit" class="search-button" id="search-button" aria-label="Search"><i class="fas fa-search"></i></button>
     </div>
     <div class="header-actions">
@@ -57,10 +57,6 @@
           Blend your favourite pieces with neural style transfer.
           <button id="select-image-button" class="btn btn-outline">Select</button>
         </div>
-        <div class="panel-actions">
-          <button id="custom-button" class="btn btn-outline custom">Custom Pieces</button>
-          <button id="CR-button" class="btn custom-rec">Artsy Recommendations</button>
-        </div>
       </div>
     </section>
 
@@ -84,7 +80,15 @@
 
   <div id="image-select-overlay">
     <div id="image-select-container">
-      <h2>Select a model</h2>
+      <button id="close-selection" class="select-back" aria-label="Back to item">
+        <i class="fas fa-arrow-left"></i> Back
+      </button>
+      <h2 id="image-select-heading">Select a model</h2>
+      <div id="nst-role-toggle" class="nst-role-toggle">
+        <span class="nst-role-label">Use the picked garment as the:</span>
+        <label><input type="radio" name="nst-role" value="style" checked> Style (pattern/texture)</label>
+        <label><input type="radio" name="nst-role" value="content"> Content (shape)</label>
+      </div>
       <div id="image-gallery"></div>
       <button id="submit-selection" class="btn btn-accent">Submit</button>
     </div>
@@ -110,7 +114,7 @@
       <span id="chatbot-close">&times;</span>
     </div>
     <div id="chatbot-messages">
-      <div class="chatbot-message bot">I'm your personal style-bot ✨ Just a quick vibe check — where are you planning to wear this and what kind of look do you want? 💕</div>
+      <div class="chatbot-message bot">Our AI style-bot is coming soon 💫 Check back shortly for personalised styling tips!</div>
     </div>
     <!-- Full chatbot implementation lives in fashion-bot.ipynb in the repo root -->
     <div id="chatbot-input-container">
@@ -122,11 +126,12 @@
   <div id="cloth-recommendation-container" class="recommendation-grid"></div>
 
   <footer class="site-footer">
-    <span>ReVeRa</span> — Where fashion meets art.
+    <span>ReVeRa</span> - Where fashion meets art.
   </footer>
 
   <script src="cloth.js"></script>
   <script src="recommendation-cloth.js"></script>
+  <script src="search-suggestions.js"></script>
   <script>
     document.getElementById("search-button").addEventListener("click", async () => {
       const query = document.getElementById("search-input").value.trim();

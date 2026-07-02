@@ -8,18 +8,31 @@ const id = getQueryParam("id");
 const clothFullId = id ? `${id}.jpg` : null;
 let selectedModel = null;
 let triggerSource = null; // NEW: to track which button triggered it
+// While true, hovering the main image swaps the on-model shot for the flat
+// garment shot (same effect as the home/recommendation cards). Turned off once
+// the box is repurposed to preview an uploaded/captured person photo.
+let clothHoverEnabled = false;
 
 if (id) {
   const box = document.getElementById("selected-image-1");
   box.style.backgroundImage = `url('images/${id}.jpg')`;
   box.style.backgroundSize = "cover";
   box.style.backgroundPosition = "center";
+  clothHoverEnabled = true;
+
+  box.addEventListener("mouseenter", () => {
+    if (clothHoverEnabled) box.style.backgroundImage = `url('cloth/${id}.jpg')`;
+  });
+  box.addEventListener("mouseleave", () => {
+    if (clothHoverEnabled) box.style.backgroundImage = `url('images/${id}.jpg')`;
+  });
 } else {
   document.getElementById("selected-image-1").textContent = "No item selected.";
 }
 
 function showPersonPreview(url) {
   const box = document.getElementById("selected-image-1");
+  clothHoverEnabled = false;
   box.style.backgroundImage = `url('${url}')`;
   box.style.backgroundSize = "cover";
   box.style.backgroundPosition = "center";
@@ -155,16 +168,25 @@ document.getElementById("select-image-button").addEventListener("click", async (
 async function openModelSelector() {
   const overlay = document.getElementById("image-select-overlay");
   const gallery = document.getElementById("image-gallery");
+  const heading = document.getElementById("image-select-heading");
   overlay.style.display = "flex";
   gallery.innerHTML = "";
+  selectedModel = null;
+
+  // Try-on picks a person to wear the garment; style transfer picks another
+  // garment to blend with, so it browses the cloth catalog instead of models.
+  const isStyle = triggerSource === "styletransfer";
+  heading.textContent = isStyle ? "Select a garment to blend" : "Select a model";
+  document.getElementById("nst-role-toggle").style.display = isStyle ? "flex" : "none";
 
   try {
-    const res = await fetch("/models");
+    const res = await fetch(isStyle ? "/cloths" : "/models");
     const data = await res.json();
+    const items = isStyle ? data.cloths : data.models;
 
-    data.models.forEach((filename) => {
+    items.forEach((filename) => {
       const img = document.createElement("img");
-      img.src = `/model-images/${filename}`;
+      img.src = isStyle ? `cloth/${filename}` : `/model-images/${filename}`;
       img.classList.add("image-option");
 
       img.addEventListener("click", () => {
@@ -178,10 +200,16 @@ async function openModelSelector() {
       gallery.appendChild(img);
     });
   } catch (err) {
-    console.error("Failed to load model images:", err);
-    gallery.innerHTML = `<p>Error loading model images</p>`;
+    console.error("Failed to load images:", err);
+    gallery.innerHTML = `<p>Error loading images</p>`;
   }
 }
+
+// Back button on the selector overlay returns to the item without submitting.
+document.getElementById("close-selection").addEventListener("click", () => {
+  document.getElementById("image-select-overlay").style.display = "none";
+  triggerSource = null;
+});
 
 // Submit for either try-on or style transfer
 document.getElementById("submit-selection").addEventListener("click", () => {
@@ -189,32 +217,45 @@ document.getElementById("submit-selection").addEventListener("click", () => {
   const preview = document.getElementById("preview-container");
 
   if (!selectedModel) {
-    alert("Please select a model image.");
+    alert("Please select an image.");
     return;
   }
 
   overlay.style.display = "none";
 
+  const isStyle = triggerSource === "styletransfer";
+
   preview.innerHTML = `
     <div class="tryon-loader-wrapper">
       <div class="fancy-loader"></div>
-      <p class="loader-text">${triggerSource === "styletransfer" ? "Blending your outfit..." : "Trying on your outfit..."} Please wait</p>
+      <p class="loader-text">${isStyle ? "Blending your outfit..." : "Trying on your outfit..."} Please wait</p>
     </div>
   `;
 
-  const endpoint = triggerSource === "styletransfer"
-    ? "/styletransfer/selected"
-    : "/tryon/selected";
+  const endpoint = isStyle ? "/styletransfer/selected" : "/tryon/selected";
+
+  // Style transfer blends two garments (current cloth + picked cloth); try-on
+  // dresses the picked model in the current cloth. For style transfer the user
+  // decides whether the garment they picked acts as the style reference or the
+  // content; the garment on the page takes the opposite role.
+  let body;
+  if (isStyle) {
+    const role = document.querySelector('input[name="nst-role"]:checked')?.value || "style";
+    const pickedAsContent = role === "content";
+    body = new URLSearchParams({
+      content_id: pickedAsContent ? selectedModel : clothFullId,
+      style_id: pickedAsContent ? clothFullId : selectedModel,
+    });
+  } else {
+    body = new URLSearchParams({ person_id: selectedModel, cloth_id: clothFullId });
+  }
 
   fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: new URLSearchParams({
-      person_id: selectedModel,
-      cloth_id: clothFullId,
-    }),
+    body,
   })
     .then((res) => {
       if (!res.ok) throw new Error("Request failed");
@@ -264,56 +305,9 @@ chatbotSend.addEventListener("click", () => {
   appendMessage(userMsg, "user");
   chatbotInput.value = "";
 
-  setTimeout(() => {
-    let response = `🧠 Styling Advice:
- 🎉🎉🎉 Vibe Summary: Bold & Glam Night Out 🌟
-
-👖 Bottoms: Black leather pants (comfortable, slimming, and complement the outfit)
-👟 Footwear: High heels (add height and confidence)
-🧥 Outerwear: A statement blazer or shrug (add texture and style)
-💄 Makeup: Bold lipstick, dramatic eyeshadow, and a smoky eye look (enhance the glam vibe)
-💇 Hairstyle: Straight, sleek hair (match the vibe and practicality)
-💍 Accessories: Earrings (add sparkle), a statement necklace (add drama), and a clutch (complete the look)
-
-Remember to have fun and enjoy the night out! 🎉🎉🎉
-`;
-    // Chatbot could not be included due to system requirements, check fashio-bot.ipynb in the root dir for it's implementation
-
-    const lower = userMsg.toLowerCase();
-
-    if (lower.includes("recommend")) {
-      response = "I recommend pairing it with bold earrings or a sleek blazer!";
-    } else if (lower.includes("color")) {
-      response = "Shades like lavender or dusty rose would work great 🌷";
-    } else if (lower.includes("match")) {
-      response = "Try matching it with beige pants or layered gold jewelry.";
-    }
-
-    appendMessage(response, "bot");
-  }, 3000);
+  // AI styling responses are not wired up yet; show a placeholder.
+  appendMessage("This feature is coming soon 💫", "bot");
 });
 chatbotInput.addEventListener("keypress", (e) => {
   if (e.key === "Enter") chatbotSend.click();
-});
-
-document.getElementById("CR-button").addEventListener("click", async () => {
-  if (!clothFullId) {
-    alert("No item selected to base recommendations on.");
-    return;
-  }
-  try {
-    // Recommend items sharing attributes (colour, pattern, category, etc.)
-    // with the garment currently being viewed.
-    const res = await fetch(`/recommend/${encodeURIComponent(clothFullId)}`);
-    if (!res.ok) throw new Error(`Request failed with status ${res.status}`);
-
-    const data = await res.json();
-    const ids = data.recommendations || [];
-
-    localStorage.setItem("customResults", JSON.stringify(ids));
-    window.location.href = "home-page.html";
-  } catch (err) {
-    alert("Could not fetch recommendations.");
-    console.error(err);
-  }
 });

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ReVeRa — Where Fashion Meets Art</title>
+    <title>ReVeRa - Where Fashion Meets Art</title>
     <link rel="stylesheet" href="new/theme.css">
     <link rel="stylesheet" href="new/style-quiz.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -23,17 +23,46 @@
             <h1>Hey there, welcome.<br>Let's find your <em>signature look</em>.</h1>
             <p class="hero-sub">
                 We're committed to making your shopping experience feel personal, fun,
-                and totally you — from smart recommendations to virtual try-on.
+                and totally you - from smart recommendations to virtual try-on.
             </p>
             <a href="new/quiz1.html"><button type="button" class="btn btn-accent">Take the Style Quiz</button></a>
             <p class="hero-note">
-                Just 2 minutes — it helps us understand your vibe and recommend pieces you'll truly love.
+                Just 2 minutes - it helps us understand your vibe and recommend pieces you'll truly love.
+            </p>
+            <button type="button" class="btn btn-outline skip-quiz" id="skip-quiz">
+                Skip for now - show me popular picks
+            </button>
+            <p class="hero-note skip-note">
+                Prefer to browse? Jump straight in with our most-loved styles. You can take the quiz anytime.
             </p>
         </section>
     </main>
 
     <footer class="site-footer">
-        <span>ReVeRa</span> — Where fashion meets art.
+        <span>ReVeRa</span> - Where fashion meets art.
     </footer>
+
+    <script>
+      const skipBtn = document.getElementById("skip-quiz");
+      skipBtn.addEventListener("click", async () => {
+        skipBtn.disabled = true;
+        const original = skipBtn.textContent;
+        skipBtn.textContent = "Loading popular picks…";
+        try {
+          const res = await fetch("/stylequiz/default");
+          const data = await res.json();
+          if (data.recommendations && data.recommendations.length) {
+            localStorage.setItem("recommendedClothIDs", JSON.stringify(data.recommendations));
+          } else {
+            localStorage.removeItem("recommendedClothIDs");
+          }
+        } catch (err) {
+          // Non-fatal: home page falls back to its own defaults.
+          console.error("Default recommendations failed:", err);
+        }
+        localStorage.removeItem("customResults");
+        window.location.href = "new/home-page.html";
+      });
+    </script>
 </body>
 </html>

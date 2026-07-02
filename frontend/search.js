@@ -1,9 +1,12 @@
-const container = document.getElementById("search-results");
-const items = JSON.parse(localStorage.getItem("searchResults")) || [];
+function renderSearchResults(items) {
+  const container = document.getElementById("search-results");
+  container.innerHTML = "";
 
-if (items.length === 0) {
-  container.innerHTML = "<p style='color:#a31967;'>No items found for your query.</p>";
-} else {
+  if (!items || items.length === 0) {
+    container.innerHTML = "<p style='color:#a31967;'>No items found for your query.</p>";
+    return;
+  }
+
   items.forEach(id => {
     const card = document.createElement("div");
     card.className = "result-card";
@@ -36,8 +39,10 @@ if (items.length === 0) {
     card.appendChild(label);
     container.appendChild(card);
   });
-
 }
+
+// Initial render from whatever the previous page stored.
+renderSearchResults(JSON.parse(localStorage.getItem("searchResults")) || []);
 
 const prevQuery = localStorage.getItem("lastSearchQuery");
 if (prevQuery) {

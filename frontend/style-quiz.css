@@ -43,3 +43,12 @@
   color: var(--muted);
   letter-spacing: 0.02em;
 }
+
+.hero .skip-quiz {
+  margin-top: 2rem;
+  display: inline-block;
+}
+
+.skip-note {
+  margin-top: 0.9rem;
+}
