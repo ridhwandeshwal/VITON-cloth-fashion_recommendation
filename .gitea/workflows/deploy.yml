@@ -27,6 +27,10 @@ jobs:
         run: docker build -t revera:latest .
 
       - name: Restart container
+        # Redirect stdin/out/err to /dev/null so the detached container does not
+        # keep the runner's log pipe open. Without this the host-mode runner
+        # blocks at "Complete job" waiting for EOF on a container that is meant
+        # to run forever.
         run: |
           docker rm -f revera 2>/dev/null || true
           docker run -d --name revera --restart unless-stopped \
@@ -34,7 +38,7 @@ jobs:
             --env-file "${{ vars.DEPLOY_HOME }}/.env" \
             -v "${{ vars.DEPLOY_HOME }}/frontend/cloth:/app/frontend/cloth:ro" \
             -v "${{ vars.DEPLOY_HOME }}/frontend/images:/app/frontend/images:ro" \
-            revera:latest
+            revera:latest </dev/null >/dev/null 2>&1
 
       - name: Prune dangling images
         run: docker image prune -f
